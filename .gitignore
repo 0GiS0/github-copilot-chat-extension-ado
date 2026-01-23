@@ -1,0 +1,26 @@
+npm-debug.log
+node_modules/
+dist/
+*.vsix
+
+# JUNIT testresult
+test-results.xml
+
+# Coverage directory used by tools like istanbul
+coverage
+*.lcov
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db

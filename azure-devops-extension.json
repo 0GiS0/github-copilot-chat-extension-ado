@@ -1,0 +1,38 @@
+{
+    "manifestVersion": 1,
+    "id": "github-copilot-chat",
+    "publisher": "returngisorg",
+    "version": "1.0.12",
+    "name": "GitHub Copilot Chat for Azure DevOps",
+    "description": "GitHub Copilot Chat integration for Azure DevOps",
+    "categories": [
+        "Azure Repos",
+        "Azure Boards",
+        "Azure Pipelines",
+        "Azure Test Plans",
+        "Azure Artifacts"
+    ],
+    "targets": [
+        {
+            "id": "Microsoft.VisualStudio.Services"
+        }
+    ],
+    "icons": {
+        "default": "logo.png"
+    },
+    "content": {
+        "details": {
+            "path": "overview.md"
+        }
+    },
+    "files": [
+        {
+            "path": "static",
+            "addressable": true
+        },
+        {
+            "path": "dist",
+            "addressable": true
+        }
+    ]
+}

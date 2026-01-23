@@ -1,0 +1,35 @@
+{
+    "contributions": [
+        {
+            "id": "copilot-hub-group",
+            "type": "ms.vss-web.hub-group",
+            "targets": [
+                "ms.vss-web.project-hub-groups-collection"
+            ],
+            "properties": {
+                "name": "Copilot",
+                "icon": {
+                    "light": "static/copilot-icon.png",
+                    "dark": "static/copilot-icon.png"
+                },
+                "order": 100
+            }
+        },
+        {
+            "id": "copilot-chat-hub",
+            "type": "ms.vss-web.hub",
+            "targets": [
+                ".copilot-hub-group"
+            ],
+            "properties": {
+                "name": "Chat",
+                "uri": "dist/copilot-hub-group/copilot-hub-group.html",
+                "icon": {
+                    "light": "static/chat-icon.png",
+                    "dark": "static/chat-icon.png"
+                },
+                "order": 1
+            }
+        }
+    ]
+}
