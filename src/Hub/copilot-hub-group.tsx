@@ -6,8 +6,10 @@ import * as SDK from "azure-devops-extension-sdk";
 
 import { Header, TitleSize } from "azure-devops-ui/Header";
 import { Page } from "azure-devops-ui/Page";
-import { TextField } from "azure-devops-ui/TextField";
 import { Button } from "azure-devops-ui/Button";
+
+// Import Copilot icon
+import copilotIcon from "../../static/copilot-icon.png";
 
 interface IChatMessage {
     id: string;
@@ -21,16 +23,21 @@ interface ICopilotChatState {
     inputValue: string;
     isLoading: boolean;
     userName: string;
+    userImageUrl: string;
 }
 
 class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
+    private messagesEndRef = React.createRef<HTMLDivElement>();
+    private textareaRef = React.createRef<HTMLTextAreaElement>();
+
     constructor(props: {}) {
         super(props);
         this.state = {
             messages: [],
             inputValue: "",
             isLoading: false,
-            userName: ""
+            userName: "",
+            userImageUrl: ""
         };
     }
 
@@ -41,19 +48,39 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
         const user = SDK.getUser();
         this.setState({ 
             userName: user.displayName,
+            userImageUrl: user.imageUrl || "",
             messages: [
                 {
                     id: "welcome",
                     role: "assistant",
-                    content: `¡Hola ${user.displayName}! 👋 Soy tu asistente de GitHub Copilot para Azure DevOps. ¿En qué puedo ayudarte hoy?`,
+                    content: `¡Hola ${user.displayName} 🔥! 👋 Soy tu asistente de GitHub Copilot para Azure DevOps. ¿En qué puedo ayudarte hoy?`,
                     timestamp: new Date()
                 }
             ]
         });
     }
 
-    private handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>, newValue: string) => {
-        this.setState({ inputValue: newValue });
+    private scrollToBottom = () => {
+        this.messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
+    componentDidUpdate(prevProps: {}, prevState: ICopilotChatState) {
+        if (prevState.messages.length !== this.state.messages.length) {
+            this.scrollToBottom();
+        }
+    }
+
+    private handleInputChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+        this.setState({ inputValue: event.target.value });
+        this.adjustTextareaHeight();
+    };
+
+    private adjustTextareaHeight = () => {
+        const textarea = this.textareaRef.current;
+        if (textarea) {
+            textarea.style.height = "auto";
+            textarea.style.height = Math.min(textarea.scrollHeight, 150) + "px";
+        }
     };
 
     private handleSendMessage = async () => {
@@ -74,6 +101,11 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
             isLoading: true 
         });
 
+        // Reset textarea height
+        if (this.textareaRef.current) {
+            this.textareaRef.current.style.height = "auto";
+        }
+
         // Simulated response - TODO: Connect to Copilot SDK
         setTimeout(() => {
             const assistantMessage: IChatMessage = {
@@ -90,12 +122,46 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
         }, 1000);
     };
 
-    private handleKeyPress = (event: React.KeyboardEvent) => {
+    private handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (event.key === "Enter" && !event.shiftKey) {
             event.preventDefault();
             this.handleSendMessage();
         }
     };
+
+    private renderAvatar(role: "user" | "assistant"): JSX.Element {
+        const { userImageUrl, userName } = this.state;
+        
+        if (role === "assistant") {
+            return (
+                <div className="message-avatar">
+                    <img src={copilotIcon} alt="Copilot" />
+                </div>
+            );
+        }
+
+        if (userImageUrl) {
+            return (
+                <div className="message-avatar">
+                    <img src={userImageUrl} alt={userName} />
+                </div>
+            );
+        }
+
+        // Fallback to initials
+        const initials = userName
+            .split(" ")
+            .map(n => n[0])
+            .join("")
+            .substring(0, 2)
+            .toUpperCase();
+
+        return (
+            <div className="message-avatar initials">
+                {initials}
+            </div>
+        );
+    }
 
     public render(): JSX.Element {
         const { messages, inputValue, isLoading } = this.state;
@@ -116,9 +182,7 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
                                     key={message.id} 
                                     className={`message ${message.role}`}
                                 >
-                                    <div className="message-avatar">
-                                        {message.role === "user" ? "👤" : "🤖"}
-                                    </div>
+                                    {this.renderAvatar(message.role)}
                                     <div className="message-content">
                                         <div className="message-text">{message.content}</div>
                                         <div className="message-time">
@@ -129,7 +193,7 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
                             ))}
                             {isLoading && (
                                 <div className="message assistant">
-                                    <div className="message-avatar">🤖</div>
+                                    {this.renderAvatar("assistant")}
                                     <div className="message-content">
                                         <div className="typing-indicator">
                                             <span></span>
@@ -139,23 +203,26 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
                                     </div>
                                 </div>
                             )}
+                            <div ref={this.messagesEndRef} />
                         </div>
                         
                         <div className="input-container">
-                            <TextField
+                            <textarea
+                                ref={this.textareaRef}
                                 value={inputValue}
                                 onChange={this.handleInputChange}
-                                onKeyPress={this.handleKeyPress}
-                                placeholder="Escribe tu mensaje... (Ej: Lista mis work items asignados)"
+                                onKeyDown={this.handleKeyDown}
+                                placeholder="Escribe tu mensaje... (Enter para enviar, Shift+Enter para nueva línea)"
                                 className="chat-input"
-                                multiline={false}
+                                rows={1}
                             />
                             <Button
-                                text="Enviar"
+                                className="send-button"
                                 primary={true}
                                 onClick={this.handleSendMessage}
                                 disabled={isLoading || !inputValue.trim()}
                                 iconProps={{ iconName: "Send" }}
+                                ariaLabel="Enviar"
                             />
                         </div>
                     </div>

@@ -19,9 +19,13 @@
         ],
         "types": [
             "react",
-            "jest",
-            "node"
+            "jest"
         ],
+        "typeRoots": [
+            "./src/types",
+            "./node_modules/@types"
+        ],
+        "skipLibCheck": true,
         "esModuleInterop": true
     }
 }

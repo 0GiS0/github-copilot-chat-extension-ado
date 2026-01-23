@@ -40,6 +40,13 @@ module.exports = (env, argv) => ({
                 type: 'asset/inline'
             },
             {
+                test: /\.(png|jpg|jpeg|gif|svg)$/,
+                type: 'asset/resource',
+                generator: {
+                    filename: 'images/[name][ext]'
+                }
+            },
+            {
                 test: /\.html$/, 
                 type: 'asset/resource'
             }
