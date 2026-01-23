@@ -1,44 +1,26 @@
-# Multi-stage build for optimized Docker image
-FROM node:20-alpine AS base
+# Simple single-stage build for GitHub Copilot CLI Server
+FROM node:22-alpine
 
-# Install necessary packages
-RUN apk add --no-cache \
-    dumb-init \
-    curl \
-    git
-
-# Create app directory
+# Set working directory
 WORKDIR /app
 
-# ============================================
-# Stage 1: Install dependencies
-# ============================================
-FROM base AS dependencies
-
-# Copy package files for server
-COPY src/server/package*.json ./
-
-# Install dependencies
-RUN npm ci --only=production && \
-    npm cache clean --force
-
-# Install GitHub Copilot CLI globally
-RUN npm install -g @github/copilot
-
-# ============================================
-# Stage 2: Production image
-# ============================================
-FROM base AS production
+# Install wget for health checks
+RUN apk add --no-cache wget || true
 
 # Set environment variables
 ENV NODE_ENV=production \
     COPILOT_PORT=3000 \
     LOG_LEVEL=info
 
-# Copy dependencies from dependencies stage
-COPY --from=dependencies /app/node_modules ./node_modules
-COPY --from=dependencies /usr/local/lib/node_modules/@github /usr/local/lib/node_modules/@github
-COPY --from=dependencies /usr/local/bin/copilot /usr/local/bin/copilot
+# Copy server package files
+COPY src/server/package*.json ./
+
+# Install dependencies (with retry logic for network issues)
+RUN npm install --production || npm install --production || npm install --production && \
+    npm cache clean --force
+
+# Install GitHub Copilot CLI globally
+RUN npm install -g @github/copilot || npm install -g @github/copilot
 
 # Copy server code
 COPY src/server/index.js ./
@@ -56,10 +38,7 @@ EXPOSE ${COPILOT_PORT}
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:${COPILOT_PORT}/health || exit 1
-
-# Use dumb-init to handle signals properly
-ENTRYPOINT ["dumb-init", "--"]
+    CMD wget --no-verbose --tries=1 --spider http://localhost:${COPILOT_PORT}/health || exit 1
 
 # Start the server
 CMD ["node", "index.js"]

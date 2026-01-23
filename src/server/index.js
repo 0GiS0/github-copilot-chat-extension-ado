@@ -1,5 +1,5 @@
-const express = require('express');
-const { CopilotClient } = require('@github/copilot-sdk');
+import express from 'express';
+import { CopilotClient } from '@github/copilot-sdk';
 
 const app = express();
 const PORT = process.env.COPILOT_PORT || 3000;

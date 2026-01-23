@@ -3,15 +3,17 @@
   "version": "1.0.0",
   "description": "GitHub Copilot CLI Server for Azure DevOps",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "@github/copilot": "^0.2.0",
-    "@github/copilot-sdk": "^0.2.0",
+    "@github/copilot": "latest",
+    "@github/copilot-sdk": "latest",
     "express": "^4.18.2"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
   }
 }
