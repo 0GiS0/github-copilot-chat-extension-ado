@@ -57,4 +57,4 @@ jobs:
         run: npm run build:dev
 
       - name: 🎉 Publish extension to Azure DevOps Marketplace
-        run: npm run publish-extension -- --token ${{ secrets.ADO_PAT }}
+        run: npm run publish-extension -- --rev-version --token ${{ secrets.ADO_PAT }}
