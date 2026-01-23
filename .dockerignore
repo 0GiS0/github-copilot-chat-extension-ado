@@ -1,0 +1,57 @@
+# Node modules
+node_modules
+npm-debug.log
+package-lock.json
+
+# Build artifacts
+dist
+*.vsix
+
+# Tests
+test-results.xml
+coverage
+*.lcov
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Git
+.git
+.gitignore
+.github
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation
+README.md
+*.md
+docs
+
+# CI/CD
+azure-pipelines.yml
+azure-pipelines-steps.yml
+
+# Extension files (not needed for Docker)
+azure-devops-extension.json
+azure-devops-extension-dev.json
+webpack.config.js
+tsconfig.json
+tsconfig.test.json
+
+# Source files not needed for Docker
+src/Hub
+src/Common.*
+src/types
+static
+logo.png
+overview.md

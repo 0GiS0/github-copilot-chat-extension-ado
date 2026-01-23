@@ -2,6 +2,10 @@
 
 This repository generates an [Azure DevOps extension](https://docs.microsoft.com/en-us/azure/devops/extend/overview?view=vsts) containing a number of different contributions of various types.
 
+## 🐳 Docker Deployment
+
+This project includes a Docker image with GitHub Copilot CLI running in server mode. For complete Docker deployment instructions, see [DOCKER.md](DOCKER.md).
+
 ## Dependencies
 
 The sample repository depends on a few Azure DevOps packages:

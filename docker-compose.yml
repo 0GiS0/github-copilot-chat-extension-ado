@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  copilot-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: copilot-server
+    ports:
+      - "${COPILOT_PORT:-3000}:${COPILOT_PORT:-3000}"
+    environment:
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - COPILOT_PORT=${COPILOT_PORT:-3000}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${COPILOT_PORT:-3000}/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    volumes:
+      # Mount GitHub configuration if available
+      - ${HOME}/.config/github-copilot:/home/nodejs/.config/github-copilot:ro
+    networks:
+      - copilot-network
+
+networks:
+  copilot-network:
+    driver: bridge
