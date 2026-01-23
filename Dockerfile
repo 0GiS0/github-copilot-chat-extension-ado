@@ -15,12 +15,11 @@ ENV NODE_ENV=production \
 # Copy server package files
 COPY src/server/package*.json ./
 
-# Install dependencies (with retry logic for network issues)
-RUN npm install --production || npm install --production || npm install --production && \
-    npm cache clean --force
+# Install dependencies with proper error handling
+RUN npm install --production && npm cache clean --force
 
 # Install GitHub Copilot CLI globally
-RUN npm install -g @github/copilot || npm install -g @github/copilot
+RUN npm install -g @github/copilot
 
 # Copy server code
 COPY src/server/index.js ./

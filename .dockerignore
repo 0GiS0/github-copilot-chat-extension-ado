@@ -1,7 +1,6 @@
 # Node modules
 node_modules
 npm-debug.log
-package-lock.json
 
 # Build artifacts
 dist
@@ -55,3 +54,6 @@ src/types
 static
 logo.png
 overview.md
+
+# Test files
+test-setup.sh

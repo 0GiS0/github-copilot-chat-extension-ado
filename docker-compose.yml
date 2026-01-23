@@ -14,7 +14,7 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-info}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${COPILOT_PORT:-3000}/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
       interval: 30s
       timeout: 5s
       retries: 3
