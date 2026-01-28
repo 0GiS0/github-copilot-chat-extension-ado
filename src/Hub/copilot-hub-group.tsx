@@ -266,6 +266,30 @@ const PROMPT_EXAMPLES: IPromptExample[] = [
       it: "Voglio automatizzare le attività ripetitive nel mio progetto",
     },
   },
+  {
+    id: "list-projects",
+    icon: "📁",
+    titles: {
+      es: "Mis proyectos",
+      en: "My projects",
+      fr: "Mes projets",
+      de: "Meine Projekte",
+      pt: "Meus projetos",
+      zh: "我的项目",
+      ja: "マイプロジェクト",
+      it: "I miei progetti",
+    },
+    prompts: {
+      es: "¿Qué proyectos tengo en mi organización de Azure DevOps?",
+      en: "What projects do I have in my Azure DevOps organization?",
+      fr: "Quels projets ai-je dans mon organisation Azure DevOps ?",
+      de: "Welche Projekte habe ich in meiner Azure DevOps-Organisation?",
+      pt: "Quais projetos eu tenho na minha organização do Azure DevOps?",
+      zh: "我的 Azure DevOps 组织中有哪些项目？",
+      ja: "Azure DevOps 組織にはどのようなプロジェクトがありますか？",
+      it: "Quali progetti ho nella mia organizzazione Azure DevOps?",
+    },
+  },
 ];
 
 interface ICopilotChatState {

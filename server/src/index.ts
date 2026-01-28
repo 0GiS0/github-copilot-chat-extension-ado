@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express, { Request, Response } from "express";
 import cors from "cors";
 import chalk from "chalk";
@@ -59,7 +60,16 @@ const log = {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const PORT = process.env.PORT || 3001;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔧 CLI Mode Configuration (set via CLI_MODE env var or .env file)
+// ─────────────────────────────────────────────────────────────────────────────
+// CLI_MODE=local  → SDK spawns and manages CLI process
+// CLI_MODE=remote → Connects to external CLI server (requires COPILOT_CLI_URL)
+// ─────────────────────────────────────────────────────────────────────────────
+const USE_LOCAL_CLI = process.env.CLI_MODE !== "remote";
 const COPILOT_CLI_URL = process.env.COPILOT_CLI_URL || "localhost:4321";
+// ─────────────────────────────────────────────────────────────────────────────
 
 const app = express();
 
@@ -86,15 +96,33 @@ async function initializeCopilotClient(): Promise<void> {
     }
 
     try {
-        copilotClient = new CopilotClient({
-            cliUrl: COPILOT_CLI_URL,
-        });
+        if (USE_LOCAL_CLI) {
+            // Local mode: SDK spawns and manages the CLI process
+            log.info("Iniciando Copilot CLI en modo local...");
+            copilotClient = new CopilotClient({
+                // No cliUrl = SDK spawns CLI locally
+                autoStart: true,
+                autoRestart: true,
+            });
+        } else {
+            // Remote mode: Connect to external CLI server
+            const cliUrl = process.env.COPILOT_CLI_URL || "localhost:4321";
+            log.info(`Conectando a CLI remoto en ${chalk.cyan(cliUrl)}...`);
+            copilotClient = new CopilotClient({
+                cliUrl: cliUrl,
+            });
+        }
 
         await copilotClient.start();
         isClientReady = true;
-        log.copilot(`Conectado a CLI en ${chalk.cyan(COPILOT_CLI_URL)}`);
+
+        if (USE_LOCAL_CLI) {
+            log.copilot("CLI local iniciado y listo ✨");
+        } else {
+            log.copilot(`Conectado a CLI remoto`);
+        }
     } catch (error) {
-        log.error(`No se pudo conectar a Copilot CLI: ${error}`);
+        log.error(`No se pudo iniciar Copilot CLI: ${error}`);
         throw error;
     }
 }
@@ -149,6 +177,25 @@ async function getOrCreateSession(sessionId: string, language = "es"): Promise<C
             systemMessage: {
                 content: getSystemMessage(language),
             },
+            mcpServers: {
+                ado: {
+                    "type": "local",
+                    "command": "npx",
+                    "tools": [
+                        "*"
+                    ],
+                    "args": [
+                        "-y",
+                        "@azure-devops/mcp",
+                        "returngisorg",
+                        "--authentication",
+                        "envvar"
+                    ],
+                    "env": {
+                        "ADO_MCP_AUTH_TOKEN": "${ADO_MCP_AUTH_TOKEN}"
+                    }
+                }
+            }
         });
         sessions.set(sessionId, session);
         log.session("created", sessionId);
@@ -294,14 +341,25 @@ app.delete("/session/:sessionId", async (req: Request, res: Response) => {
 app.listen(PORT, async () => {
     log.banner();
     log.server(`Servidor ejecutándose en ${chalk.cyan(`http://localhost:${PORT}`)}`);
-    log.info(`Conectando a Copilot CLI en ${chalk.cyan(COPILOT_CLI_URL)}...`);
+
+    if (USE_LOCAL_CLI) {
+        log.info("Modo: CLI Local (SDK gestiona el proceso)");
+    } else {
+        const cliUrl = process.env.COPILOT_CLI_URL || "localhost:4321";
+        log.info(`Modo: CLI Remoto (${chalk.cyan(cliUrl)})`);
+    }
 
     try {
         await initializeCopilotClient();
         log.success("¡Listo para recibir peticiones! 🎉");
     } catch (error) {
-        log.warn("No se pudo conectar a Copilot CLI. Asegúrate de que esté ejecutándose:");
-        log.info(chalk.yellow("  copilot --server --port 4321"));
+        if (USE_LOCAL_CLI) {
+            log.warn("No se pudo iniciar el CLI local. Verifica la instalación:");
+            log.info(chalk.yellow("  npm install -g @anthropic-ai/claude-code"));
+        } else {
+            log.warn("No se pudo conectar a Copilot CLI. Asegúrate de que esté ejecutándose:");
+            log.info(chalk.yellow("  copilot --server --port 4321"));
+        }
     }
 });
 
