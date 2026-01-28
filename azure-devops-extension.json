@@ -2,7 +2,7 @@
     "manifestVersion": 1,
     "id": "github-copilot-chat",
     "publisher": "returngisorg",
-    "version": "1.0.13",
+    "version": "1.0.14",
     "name": "GitHub Copilot Chat for Azure DevOps",
     "description": "GitHub Copilot Chat integration for Azure DevOps",
     "categories": [
