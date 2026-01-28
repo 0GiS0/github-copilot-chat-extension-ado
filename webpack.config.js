@@ -8,64 +8,73 @@ const entries = {};
 entries["copilot-hub-group"] = "./src/Hub/copilot-hub-group";
 
 module.exports = (env, argv) => ({
-    entry: entries,
-    output: {
-        filename: "[name]/[name].js"
+  entry: entries,
+  output: {
+    filename: "[name]/[name].js",
+    publicPath: "/dist/",
+  },
+  resolve: {
+    extensions: [".ts", ".tsx", ".js"],
+    alias: {
+      "azure-devops-extension-sdk": path.resolve(
+        "node_modules/azure-devops-extension-sdk",
+      ),
     },
-    resolve: {
-        extensions: [".ts", ".tsx", ".js"],
-        alias: {
-            "azure-devops-extension-sdk": path.resolve("node_modules/azure-devops-extension-sdk")
+  },
+  stats: {
+    warnings: false,
+  },
+  module: {
+    rules: [
+      {
+        test: /\.tsx?$/,
+        loader: "ts-loader",
+      },
+      {
+        test: /\.scss$/,
+        use: ["style-loader", "css-loader", "sass-loader"],
+      },
+      {
+        test: /\.css$/,
+        use: ["style-loader", "css-loader"],
+      },
+      {
+        test: /\.(woff|woff2|eot|ttf|otf)$/,
+        type: "asset/inline",
+      },
+      {
+        test: /\.(png|jpg|jpeg|gif|svg)$/,
+        type: "asset/resource",
+        generator: {
+          filename: "images/[name][ext]",
         },
-    },
-    stats: {
-        warnings: false
-    },
-    module: {
-        rules: [
-            {
-                test: /\.tsx?$/,
-                loader: "ts-loader"
-            },
-            {
-                test: /\.scss$/,
-                use: ["style-loader", "css-loader", "sass-loader"],
-            },
-            {
-                test: /\.css$/,
-                use: ["style-loader", "css-loader"],
-            },
-            {
-                test: /\.(woff|woff2|eot|ttf|otf)$/, 
-                type: 'asset/inline'
-            },
-            {
-                test: /\.(png|jpg|jpeg|gif|svg)$/,
-                type: 'asset/resource',
-                generator: {
-                    filename: 'images/[name][ext]'
-                }
-            },
-            {
-                test: /\.html$/, 
-                type: 'asset/resource'
-            }
-        ]
-    },
-    plugins: [
-        new CopyWebpackPlugin({
-           patterns: [ 
-               { from: "src/Hub/copilot-hub-group.html", to: "copilot-hub-group/" }
-           ]
-        })
+      },
+      {
+        test: /\.html$/,
+        type: "asset/resource",
+      },
     ],
-    ...(env.WEBPACK_SERVE
-        ? {
-              devtool: 'inline-source-map',
-              devServer: {
-                  server: 'https',
-                  port: 3000
-              }
-          }
-        : {})
+  },
+  plugins: [
+    new CopyWebpackPlugin({
+      patterns: [
+        { from: "src/Hub/copilot-hub-group.html", to: "copilot-hub-group/" },
+      ],
+    }),
+  ],
+  ...(env.WEBPACK_SERVE
+    ? {
+        devtool: "inline-source-map",
+        devServer: {
+          server: "https",
+          port: 3000,
+          client: {
+            overlay: {
+              errors: true,
+              warnings: false,
+            },
+          },
+        },
+      }
+    : {}),
 });

@@ -2,9 +2,10 @@
     "manifestVersion": 1,
     "id": "github-copilot-chat-dev",
     "publisher": "returngisorg",
-    "version": "0.0.7",
+    "version": "0.0.9",
     "name": "GitHub Copilot Chat [DEV]",
     "description": "GitHub Copilot Chat for Azure DevOps - Development version",
+    "baseUri": "https://localhost:3000",
     "categories": [
         "Azure Pipelines"
     ],
