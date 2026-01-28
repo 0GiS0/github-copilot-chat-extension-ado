@@ -1,0 +1,30 @@
+{
+    "name": "copilot-proxy-server",
+    "version": "1.0.0",
+    "description": "Backend proxy for GitHub Copilot SDK - bridges browser extension with Copilot CLI",
+    "type": "module",
+    "main": "dist/index.js",
+    "engines": {
+        "node": ">=18.0.0"
+    },
+    "scripts": {
+        "build": "tsc",
+        "start": "node dist/index.js",
+        "dev": "tsx watch src/index.ts",
+        "lint": "tsc --noEmit"
+    },
+    "dependencies": {
+        "@github/copilot-sdk": "^0.1.19",
+        "chalk": "^5.6.2",
+        "cors": "^2.8.5",
+        "express": "^4.21.0",
+        "zod": "^4.3.6"
+    },
+    "devDependencies": {
+        "@types/cors": "^2.8.17",
+        "@types/express": "^4.17.21",
+        "@types/node": "^22.0.0",
+        "tsx": "^4.19.0",
+        "typescript": "^5.9.3"
+    }
+}

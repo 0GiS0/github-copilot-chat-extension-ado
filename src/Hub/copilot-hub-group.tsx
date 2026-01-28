@@ -4,12 +4,108 @@ import * as React from "react";
 import * as ReactDOM from "react-dom";
 import * as SDK from "azure-devops-extension-sdk";
 
+import { copilotService } from "../services/copilot-service";
+
 import { Header, TitleSize } from "azure-devops-ui/Header";
 import { Page } from "azure-devops-ui/Page";
 import { Button } from "azure-devops-ui/Button";
 
 // Import Copilot icon
 import copilotIcon from "../../static/copilot-icon.png";
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🌍 Language Configuration
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface ILanguage {
+  code: string;
+  name: string;
+  flag: string;
+  welcomeMessage: (userName: string) => string;
+  placeholder: string;
+  promptsTitle: string;
+}
+
+const LANGUAGES: ILanguage[] = [
+  {
+    code: "es",
+    name: "Español",
+    flag: "🇪🇸",
+    welcomeMessage: (userName: string) =>
+      `¡Hola ${userName} 🔥! 👋 Soy tu asistente de GitHub Copilot para Azure DevOps. ¿En qué puedo ayudarte hoy?`,
+    placeholder:
+      "Escribe tu mensaje... (Enter para enviar, Shift+Enter para nueva línea)",
+    promptsTitle: "💡 Prueba estos prompts",
+  },
+  {
+    code: "en",
+    name: "English",
+    flag: "🇬🇧",
+    welcomeMessage: (userName: string) =>
+      `Hello ${userName} 🔥! 👋 I'm your GitHub Copilot assistant for Azure DevOps. How can I help you today?`,
+    placeholder:
+      "Type your message... (Enter to send, Shift+Enter for new line)",
+    promptsTitle: "💡 Try these prompts",
+  },
+  {
+    code: "fr",
+    name: "Français",
+    flag: "🇫🇷",
+    welcomeMessage: (userName: string) =>
+      `Bonjour ${userName} 🔥! 👋 Je suis votre assistant GitHub Copilot pour Azure DevOps. Comment puis-je vous aider ?`,
+    placeholder:
+      "Écrivez votre message... (Entrée pour envoyer, Shift+Entrée pour nouvelle ligne)",
+    promptsTitle: "💡 Essayez ces prompts",
+  },
+  {
+    code: "de",
+    name: "Deutsch",
+    flag: "🇩🇪",
+    welcomeMessage: (userName: string) =>
+      `Hallo ${userName} 🔥! 👋 Ich bin dein GitHub Copilot Assistent für Azure DevOps. Wie kann ich dir helfen?`,
+    placeholder:
+      "Schreibe deine Nachricht... (Enter zum Senden, Shift+Enter für neue Zeile)",
+    promptsTitle: "💡 Probiere diese Prompts",
+  },
+  {
+    code: "pt",
+    name: "Português",
+    flag: "🇧🇷",
+    welcomeMessage: (userName: string) =>
+      `Olá ${userName} 🔥! 👋 Sou seu assistente GitHub Copilot para Azure DevOps. Como posso ajudá-lo hoje?`,
+    placeholder:
+      "Digite sua mensagem... (Enter para enviar, Shift+Enter para nova linha)",
+    promptsTitle: "💡 Experimente estes prompts",
+  },
+  {
+    code: "zh",
+    name: "中文",
+    flag: "🇨🇳",
+    welcomeMessage: (userName: string) =>
+      `你好 ${userName} 🔥! 👋 我是你的 Azure DevOps GitHub Copilot 助手。今天我能帮你什么？`,
+    placeholder: "输入您的消息... (回车发送, Shift+回车换行)",
+    promptsTitle: "💡 试试这些提示",
+  },
+  {
+    code: "ja",
+    name: "日本語",
+    flag: "🇯🇵",
+    welcomeMessage: (userName: string) =>
+      `こんにちは ${userName} 🔥! 👋 Azure DevOps 用の GitHub Copilot アシスタントです。今日は何をお手伝いしましょうか？`,
+    placeholder: "メッセージを入力... (Enterで送信, Shift+Enterで改行)",
+    promptsTitle: "💡 これらのプロンプトを試してください",
+  },
+  {
+    code: "it",
+    name: "Italiano",
+    flag: "🇮🇹",
+    welcomeMessage: (userName: string) =>
+      `Ciao ${userName} 🔥! 👋 Sono il tuo assistente GitHub Copilot per Azure DevOps. Come posso aiutarti oggi?`,
+    placeholder:
+      "Scrivi il tuo messaggio... (Invio per inviare, Shift+Invio per nuova riga)",
+    promptsTitle: "💡 Prova questi prompt",
+  },
+];
 
 interface IChatMessage {
   id: string;
@@ -21,46 +117,154 @@ interface IChatMessage {
 interface IPromptExample {
   id: string;
   icon: string;
-  title: string;
-  prompt: string;
+  titles: { [lang: string]: string };
+  prompts: { [lang: string]: string };
 }
 
 const PROMPT_EXAMPLES: IPromptExample[] = [
   {
     id: "new-project",
     icon: "🚀",
-    title: "Nuevo proyecto",
-    prompt: "Quiero empezar un nuevo proyecto en Azure DevOps",
+    titles: {
+      es: "Nuevo proyecto",
+      en: "New project",
+      fr: "Nouveau projet",
+      de: "Neues Projekt",
+      pt: "Novo projeto",
+      zh: "新项目",
+      ja: "新しいプロジェクト",
+      it: "Nuovo progetto",
+    },
+    prompts: {
+      es: "Quiero empezar un nuevo proyecto en Azure DevOps",
+      en: "I want to start a new project in Azure DevOps",
+      fr: "Je veux démarrer un nouveau projet dans Azure DevOps",
+      de: "Ich möchte ein neues Projekt in Azure DevOps starten",
+      pt: "Quero iniciar um novo projeto no Azure DevOps",
+      zh: "我想在 Azure DevOps 中启动一个新项目",
+      ja: "Azure DevOps で新しいプロジェクトを始めたい",
+      it: "Voglio iniziare un nuovo progetto in Azure DevOps",
+    },
   },
   {
     id: "create-pipeline",
     icon: "⚙️",
-    title: "Crear pipeline",
-    prompt: "Ayúdame a crear un pipeline de CI/CD para mi aplicación",
+    titles: {
+      es: "Crear pipeline",
+      en: "Create pipeline",
+      fr: "Créer un pipeline",
+      de: "Pipeline erstellen",
+      pt: "Criar pipeline",
+      zh: "创建管道",
+      ja: "パイプラインを作成",
+      it: "Creare pipeline",
+    },
+    prompts: {
+      es: "Ayúdame a crear un pipeline de CI/CD para mi aplicación",
+      en: "Help me create a CI/CD pipeline for my application",
+      fr: "Aide-moi à créer un pipeline CI/CD pour mon application",
+      de: "Hilf mir, eine CI/CD-Pipeline für meine Anwendung zu erstellen",
+      pt: "Ajude-me a criar um pipeline de CI/CD para minha aplicação",
+      zh: "帮我为我的应用程序创建 CI/CD 管道",
+      ja: "アプリケーション用の CI/CD パイプラインの作成を手伝ってください",
+      it: "Aiutami a creare una pipeline CI/CD per la mia applicazione",
+    },
   },
   {
     id: "work-items",
     icon: "📋",
-    title: "Gestionar work items",
-    prompt: "¿Cómo puedo organizar mis work items y sprints?",
+    titles: {
+      es: "Gestionar work items",
+      en: "Manage work items",
+      fr: "Gérer les éléments",
+      de: "Work Items verwalten",
+      pt: "Gerenciar work items",
+      zh: "管理工作项",
+      ja: "作業項目を管理",
+      it: "Gestire work items",
+    },
+    prompts: {
+      es: "¿Cómo puedo organizar mis work items y sprints?",
+      en: "How can I organize my work items and sprints?",
+      fr: "Comment puis-je organiser mes éléments de travail et sprints ?",
+      de: "Wie kann ich meine Work Items und Sprints organisieren?",
+      pt: "Como posso organizar meus work items e sprints?",
+      zh: "如何组织我的工作项和冲刺？",
+      ja: "作業項目とスプリントをどのように整理できますか？",
+      it: "Come posso organizzare i miei work items e sprint?",
+    },
   },
   {
     id: "code-review",
     icon: "🔍",
-    title: "Code review",
-    prompt: "Dame buenas prácticas para hacer code reviews en Azure Repos",
+    titles: {
+      es: "Code review",
+      en: "Code review",
+      fr: "Revue de code",
+      de: "Code-Review",
+      pt: "Revisão de código",
+      zh: "代码审查",
+      ja: "コードレビュー",
+      it: "Code review",
+    },
+    prompts: {
+      es: "Dame buenas prácticas para hacer code reviews en Azure Repos",
+      en: "Give me best practices for code reviews in Azure Repos",
+      fr: "Donne-moi les meilleures pratiques pour les revues de code dans Azure Repos",
+      de: "Gib mir Best Practices für Code-Reviews in Azure Repos",
+      pt: "Me dê boas práticas para revisões de código no Azure Repos",
+      zh: "给我在 Azure Repos 中进行代码审查的最佳实践",
+      ja: "Azure Repos でのコードレビューのベストプラクティスを教えてください",
+      it: "Dammi le best practice per le code review in Azure Repos",
+    },
   },
   {
     id: "security",
     icon: "🔒",
-    title: "Seguridad",
-    prompt: "¿Cómo puedo mejorar la seguridad de mi repositorio?",
+    titles: {
+      es: "Seguridad",
+      en: "Security",
+      fr: "Sécurité",
+      de: "Sicherheit",
+      pt: "Segurança",
+      zh: "安全",
+      ja: "セキュリティ",
+      it: "Sicurezza",
+    },
+    prompts: {
+      es: "¿Cómo puedo mejorar la seguridad de mi repositorio?",
+      en: "How can I improve my repository's security?",
+      fr: "Comment puis-je améliorer la sécurité de mon dépôt ?",
+      de: "Wie kann ich die Sicherheit meines Repositories verbessern?",
+      pt: "Como posso melhorar a segurança do meu repositório?",
+      zh: "如何提高我仓库的安全性？",
+      ja: "リポジトリのセキュリティを改善するにはどうすればよいですか？",
+      it: "Come posso migliorare la sicurezza del mio repository?",
+    },
   },
   {
     id: "automation",
     icon: "🤖",
-    title: "Automatización",
-    prompt: "Quiero automatizar tareas repetitivas en mi proyecto",
+    titles: {
+      es: "Automatización",
+      en: "Automation",
+      fr: "Automatisation",
+      de: "Automatisierung",
+      pt: "Automação",
+      zh: "自动化",
+      ja: "自動化",
+      it: "Automazione",
+    },
+    prompts: {
+      es: "Quiero automatizar tareas repetitivas en mi proyecto",
+      en: "I want to automate repetitive tasks in my project",
+      fr: "Je veux automatiser les tâches répétitives dans mon projet",
+      de: "Ich möchte wiederkehrende Aufgaben in meinem Projekt automatisieren",
+      pt: "Quero automatizar tarefas repetitivas no meu projeto",
+      zh: "我想在项目中自动化重复性任务",
+      ja: "プロジェクト内の繰り返し作業を自動化したい",
+      it: "Voglio automatizzare le attività ripetitive nel mio progetto",
+    },
   },
 ];
 
@@ -70,6 +274,11 @@ interface ICopilotChatState {
   isLoading: boolean;
   userName: string;
   userImageUrl: string;
+  streamingMessageId: string | null;
+  isConnected: boolean;
+  connectionError: string | null;
+  selectedLanguage: ILanguage;
+  isLanguageSelectorOpen: boolean;
 }
 
 class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
@@ -84,6 +293,11 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
       isLoading: false,
       userName: "",
       userImageUrl: "",
+      streamingMessageId: null,
+      isConnected: false,
+      connectionError: null,
+      selectedLanguage: LANGUAGES[0], // Default to Spanish
+      isLanguageSelectorOpen: false,
     };
   }
 
@@ -92,6 +306,7 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
     await SDK.ready();
 
     const user = SDK.getUser();
+    const defaultLang = LANGUAGES[0];
     this.setState({
       userName: user.displayName,
       userImageUrl: user.imageUrl || "",
@@ -99,11 +314,30 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
         {
           id: "welcome",
           role: "assistant",
-          content: `¡Hola ${user.displayName} 🔥! 👋 Soy tu asistente de GitHub Copilot para Azure DevOps. ¿En qué puedo ayudarte hoy?`,
+          content: defaultLang.welcomeMessage(user.displayName),
           timestamp: new Date(),
         },
       ],
     });
+
+    // Initialize Copilot service
+    this.initializeCopilot();
+  }
+
+  private async initializeCopilot() {
+    try {
+      await copilotService.initialize();
+      this.setState({ isConnected: true, connectionError: null });
+      console.log("[CopilotChatHub] Connected to Copilot CLI");
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Error desconocido";
+      this.setState({
+        isConnected: false,
+        connectionError: `No se pudo conectar con Copilot CLI: ${errorMessage}. Asegúrate de que esté ejecutándose con: copilot --server --port 4321`,
+      });
+      console.error("[CopilotChatHub] Failed to connect:", error);
+    }
   }
 
   private scrollToBottom = () => {
@@ -132,9 +366,26 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
   };
 
   private handleSendMessage = async () => {
-    const { inputValue, messages } = this.state;
+    const { inputValue, messages, isConnected } = this.state;
 
     if (!inputValue.trim()) return;
+
+    // Check connection status
+    if (!isConnected) {
+      this.setState({
+        messages: [
+          ...messages,
+          {
+            id: `error-${Date.now()}`,
+            role: "assistant",
+            content:
+              "⚠️ No hay conexión con Copilot CLI. Asegúrate de ejecutar: `copilot --server --port 4321`",
+            timestamp: new Date(),
+          },
+        ],
+      });
+      return;
+    }
 
     const userMessage: IChatMessage = {
       id: `user-${Date.now()}`,
@@ -143,10 +394,20 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
       timestamp: new Date(),
     };
 
+    // Create placeholder message for streaming
+    const assistantMessageId = `assistant-${Date.now()}`;
+    const assistantMessage: IChatMessage = {
+      id: assistantMessageId,
+      role: "assistant",
+      content: "",
+      timestamp: new Date(),
+    };
+
     this.setState({
-      messages: [...messages, userMessage],
+      messages: [...messages, userMessage, assistantMessage],
       inputValue: "",
       isLoading: true,
+      streamingMessageId: assistantMessageId,
     });
 
     // Reset textarea height
@@ -154,20 +415,53 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
       this.textareaRef.current.style.height = "auto";
     }
 
-    // Simulated response - TODO: Connect to Copilot SDK
-    setTimeout(() => {
-      const assistantMessage: IChatMessage = {
-        id: `assistant-${Date.now()}`,
-        role: "assistant",
-        content: `🚧 **Modo Demo**: Recibí tu mensaje: "${inputValue}"\n\nEsta es una respuesta simulada. Próximamente conectaremos con GitHub Copilot SDK + Azure DevOps MCP Server para respuestas reales.`,
-        timestamp: new Date(),
-      };
-
+    // Send message to Copilot with streaming
+    try {
+      await copilotService.sendMessage(
+        inputValue,
+        // onDelta: update message content progressively
+        (deltaContent) => {
+          this.setState((prevState) => ({
+            messages: prevState.messages.map((msg) =>
+              msg.id === assistantMessageId
+                ? { ...msg, content: msg.content + deltaContent }
+                : msg,
+            ),
+          }));
+        },
+        // onComplete: finalize the message
+        (_fullContent) => {
+          this.setState({
+            isLoading: false,
+            streamingMessageId: null,
+          });
+        },
+        // onError: handle errors
+        (error) => {
+          this.setState((prevState) => ({
+            messages: prevState.messages.map((msg) =>
+              msg.id === assistantMessageId
+                ? { ...msg, content: `❌ Error: ${error.message}` }
+                : msg,
+            ),
+            isLoading: false,
+            streamingMessageId: null,
+          }));
+        },
+      );
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Error desconocido";
       this.setState((prevState) => ({
-        messages: [...prevState.messages, assistantMessage],
+        messages: prevState.messages.map((msg) =>
+          msg.id === assistantMessageId
+            ? { ...msg, content: `❌ Error al enviar mensaje: ${errorMessage}` }
+            : msg,
+        ),
         isLoading: false,
+        streamingMessageId: null,
       }));
-    }, 1000);
+    }
   };
 
   private handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -213,8 +507,41 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
     return <div className="message-avatar initials">{initials}</div>;
   }
 
+  private handleLanguageChange = (language: ILanguage) => {
+    const { userName, messages } = this.state;
+
+    // Update welcome message with new language
+    const updatedMessages = messages.map((msg) =>
+      msg.id === "welcome"
+        ? { ...msg, content: language.welcomeMessage(userName) }
+        : msg,
+    );
+
+    this.setState({
+      selectedLanguage: language,
+      isLanguageSelectorOpen: false,
+      messages: updatedMessages,
+    });
+
+    // Update the service with the new language
+    copilotService.setLanguage(language.code);
+  };
+
+  private toggleLanguageSelector = () => {
+    this.setState((prevState) => ({
+      isLanguageSelectorOpen: !prevState.isLanguageSelectorOpen,
+    }));
+  };
+
   public render(): JSX.Element {
-    const { messages, inputValue, isLoading } = this.state;
+    const {
+      messages,
+      inputValue,
+      isLoading,
+      selectedLanguage,
+      isLanguageSelectorOpen,
+    } = this.state;
+    const langCode = selectedLanguage.code;
 
     return (
       <Page className="copilot-chat-page flex-grow">
@@ -225,6 +552,39 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
         />
 
         <div className="page-content flex-grow">
+          {/* Language Selector */}
+          <div className="language-selector-container">
+            <button
+              className="language-selector-button"
+              onClick={this.toggleLanguageSelector}
+              aria-label="Select language"
+            >
+              <span className="language-flag">{selectedLanguage.flag}</span>
+              <span className="language-name">{selectedLanguage.name}</span>
+              <span className="language-arrow">
+                {isLanguageSelectorOpen ? "▲" : "▼"}
+              </span>
+            </button>
+
+            {isLanguageSelectorOpen && (
+              <div className="language-dropdown">
+                {LANGUAGES.map((lang) => (
+                  <button
+                    key={lang.code}
+                    className={`language-option ${lang.code === selectedLanguage.code ? "selected" : ""}`}
+                    onClick={() => this.handleLanguageChange(lang)}
+                  >
+                    <span className="language-flag">{lang.flag}</span>
+                    <span className="language-name">{lang.name}</span>
+                    {lang.code === selectedLanguage.code && (
+                      <span className="language-check">✓</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="main-layout">
             <div className="chat-container">
               <div className="messages-container">
@@ -260,7 +620,7 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
                   value={inputValue}
                   onChange={this.handleInputChange}
                   onKeyDown={this.handleKeyDown}
-                  placeholder="Escribe tu mensaje... (Enter para enviar, Shift+Enter para nueva línea)"
+                  placeholder={selectedLanguage.placeholder}
                   className="chat-input"
                   rows={1}
                 />
@@ -278,19 +638,27 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
             <div className="prompts-sidebar">
               <div className="prompts-header">
                 <span className="prompts-icon">💡</span>
-                <h3>Prueba estos prompts</h3>
+                <h3>{selectedLanguage.promptsTitle.replace("💡 ", "")}</h3>
               </div>
               <div className="prompts-list">
                 {PROMPT_EXAMPLES.map((example) => (
                   <button
                     key={example.id}
                     className="prompt-card"
-                    onClick={() => this.handlePromptClick(example.prompt)}
+                    onClick={() =>
+                      this.handlePromptClick(
+                        example.prompts[langCode] || example.prompts["en"],
+                      )
+                    }
                   >
                     <span className="prompt-icon">{example.icon}</span>
                     <div className="prompt-info">
-                      <span className="prompt-title">{example.title}</span>
-                      <span className="prompt-text">{example.prompt}</span>
+                      <span className="prompt-title">
+                        {example.titles[langCode] || example.titles["en"]}
+                      </span>
+                      <span className="prompt-text">
+                        {example.prompts[langCode] || example.prompts["en"]}
+                      </span>
                     </div>
                   </button>
                 ))}
