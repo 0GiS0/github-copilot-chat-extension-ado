@@ -1,5 +1,7 @@
 # GitHub Copilot Chat for Azure DevOps
 
+🌍 *[Read in English](README.en.md)*
+
 Una extensión de Azure DevOps que integra GitHub Copilot Chat directamente en tu flujo de trabajo de desarrollo.
 
 ![GitHub Copilot Chat Extension](static/copilot-icon.png)
