@@ -8,13 +8,18 @@ const GITHUB_TOKEN_KEY = "copilot_github_token";
 export type StreamCallback = (deltaContent: string) => void;
 export type CompleteCallback = (fullContent: string) => void;
 export type ErrorCallback = (error: Error) => void;
+export type ProgressCallback = (action: string, detail: string) => void;
 
 interface SSEEvent {
-    type: "session" | "delta" | "complete" | "error";
+    type: "session" | "delta" | "complete" | "error" | "progress";
     content?: string;
     error?: string;
     sessionId?: string;
     resetSession?: boolean;
+    action?: string;
+    tool?: string;
+    agent?: string;
+    success?: boolean;
 }
 
 interface DeviceCodeResponse {
@@ -291,7 +296,8 @@ class CopilotService {
         onDelta: StreamCallback,
         onComplete: CompleteCallback,
         onError: ErrorCallback,
-        model?: string
+        model?: string,
+        onProgress?: ProgressCallback
     ): Promise<void> {
         if (!this.githubToken) {
             onError(new Error("Not authenticated with GitHub. Please sign in first."));
@@ -371,6 +377,13 @@ class CopilotService {
                                 case "complete":
                                     onComplete(event.content || fullContent);
                                     return;
+
+                                case "progress":
+                                    if (onProgress && event.action) {
+                                        const detail = event.tool || event.agent || "";
+                                        onProgress(event.action, detail);
+                                    }
+                                    break;
 
                                 case "error":
                                     if (event.resetSession) {

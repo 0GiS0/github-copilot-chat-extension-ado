@@ -2,6 +2,8 @@ import "dotenv/config";
 import express, { Request, Response } from "express";
 import cors from "cors";
 import chalk from "chalk";
+import { quickstartsExpertAgent } from "./agents/index.js";
+import { createAdoProjectTools } from "./tools/index.js";
 
 // @github/copilot-sdk is ESM-only; we lazy-load with dynamic import().
 let _CopilotClient: any;
@@ -340,6 +342,18 @@ Ayudas a los usuarios con:
 - Seguridad y permisos en Azure DevOps
 - Automatización y extensiones
 
+## REGLA CRÍTICA — Creación de proyectos y Quickstarts
+
+La organización (returngisorg) tiene un proyecto llamado **"Quickstarts"** en Azure DevOps que contiene repositorios plantilla para diferentes tecnologías.
+
+**Cuando un usuario quiera crear un nuevo proyecto o pregunte por plantillas/templates:**
+1. **SIEMPRE** usa las herramientas MCP de Azure DevOps para listar los repositorios del proyecto "Quickstarts" ANTES de responder.
+2. **NUNCA** sugieras crear un proyecto desde cero. Todo nuevo proyecto DEBE basarse en una plantilla del proyecto Quickstarts.
+3. Si no hay un Quickstart adecuado, muestra los que hay disponibles, sugiere el más cercano y recomienda crear primero un nuevo Quickstart.
+4. El flujo obligatorio es: Entender necesidades → Listar Quickstarts disponibles → Recomendar plantilla → Confirmar selección → Usar las tools (create_ado_project → create_ado_repo → import_quickstart_repo) para crear el proyecto.
+
+**Triggers para consultar Quickstarts:** cualquier mención de "plantilla", "template", "proyecto nuevo", "crear proyecto", "quickstart", "starter", "arrancar", "empezar un proyecto", o preguntas sobre qué tecnologías/frameworks están disponibles.
+
 ${langPrompt} Usa emojis cuando sea apropiado para hacer las respuestas más amigables.`;
 }
 
@@ -441,6 +455,9 @@ app.post("/chat", async (req: Request, res: Response) => {
         client = new ClientClass({ githubToken });
         await client.start();
 
+        // Create per-request tools that capture the user's ADO token
+        const adoTools = adoToken ? await createAdoProjectTools(adoToken) : [];
+
         let sessionId: string;
         let isNew: boolean;
 
@@ -453,6 +470,8 @@ app.post("/chat", async (req: Request, res: Response) => {
                     onPermissionRequest: _approveAll,
                     systemMessage: { content: getSystemMessage(language) },
                     mcpServers: mcpConfig,
+                    customAgents: [quickstartsExpertAgent],
+                    tools: adoTools,
                 });
                 existing.lastActivity = Date.now();
                 isNew = false;
@@ -469,6 +488,8 @@ app.post("/chat", async (req: Request, res: Response) => {
                     onPermissionRequest: _approveAll,
                     systemMessage: { content: getSystemMessage(language) },
                     mcpServers: mcpConfig,
+                    customAgents: [quickstartsExpertAgent],
+                    tools: adoTools,
                 });
                 userSessionIds.set(key, { sessionId, lastActivity: Date.now() });
                 isNew = true;
@@ -483,6 +504,8 @@ app.post("/chat", async (req: Request, res: Response) => {
                 onPermissionRequest: _approveAll,
                 systemMessage: { content: getSystemMessage(language) },
                 mcpServers: mcpConfig,
+                customAgents: [quickstartsExpertAgent],
+                tools: adoTools,
             });
             userSessionIds.set(key, { sessionId, lastActivity: Date.now() });
             isNew = true;
@@ -499,6 +522,62 @@ app.post("/chat", async (req: Request, res: Response) => {
         let chunkCount = 0;
         let completed = false;
 
+        // ── Debug: log ALL session events to discover field names ──
+        const unsubscribeAllEvents = session.on((event: any) => {
+            if (completed) return;
+            const type = event?.type || "?";
+            // Skip high-frequency delta events
+            if (type === "assistant.message_delta") return;
+            log.debug(`📨 Event [${type}]: ${JSON.stringify(event.data || {}).substring(0, 300)}`);
+        });
+
+        // ── Subscribe to tool execution events for progress feedback ──
+        const extractToolName = (eventData: any): string => {
+            return eventData?.mcpToolName
+                || eventData?.toolName
+                || eventData?.name
+                || eventData?.tool?.name
+                || eventData?.tool
+                || "unknown";
+        };
+
+        const unsubscribeToolStart = session.on("tool.execution_start", (event: any) => {
+            if (completed) return;
+            const toolName = extractToolName(event.data);
+            log.debug(`🔧 Tool started: ${toolName}`);
+            // Log full event data for debugging
+            log.debug(`   Event data keys: ${JSON.stringify(Object.keys(event.data || {}))}`);
+            res.write(`data: ${JSON.stringify({ type: "progress", action: "tool_start", tool: toolName })}\n\n`);
+        });
+
+        const unsubscribeToolEnd = session.on("tool.execution_complete", (event: any) => {
+            if (completed) return;
+            const toolName = extractToolName(event.data);
+            const success = event.data?.success ?? true;
+            const errorMsg = event.data?.error || event.data?.errorMessage || event.data?.result?.error || "";
+            if (success) {
+                log.debug(`🔧 Tool completed: ${toolName} (✅)`);
+            } else {
+                log.error(`🔧 Tool FAILED: ${toolName} ❌ — ${errorMsg || "(no error detail in event)"}`);
+                log.debug(`   Full event data: ${JSON.stringify(event.data)}`);
+            }
+            res.write(`data: ${JSON.stringify({ type: "progress", action: "tool_end", tool: toolName, success })}\n\n`);
+        });
+
+        const unsubscribeAgentStart = session.on("subagent.started", (event: any) => {
+            if (completed) return;
+            const agentName = event.data?.agentDisplayName || event.data?.agentName || "agent";
+            log.debug(`🤖 Agent started: ${agentName}`);
+            res.write(`data: ${JSON.stringify({ type: "progress", action: "agent_start", agent: agentName })}\n\n`);
+        });
+
+        const unsubscribeAgentEnd = session.on("subagent.completed", (event: any) => {
+            if (completed) return;
+            const agentName = event.data?.agentDisplayName || event.data?.agentName || "agent";
+            log.debug(`🤖 Agent completed: ${agentName}`);
+            res.write(`data: ${JSON.stringify({ type: "progress", action: "agent_end", agent: agentName })}\n\n`);
+        });
+
         const unsubscribeDelta = session.on("assistant.message_delta", (event: any) => {
             if (completed) return;
             const delta = event.data?.deltaContent ?? "";
@@ -507,10 +586,19 @@ app.post("/chat", async (req: Request, res: Response) => {
             res.write(`data: ${JSON.stringify({ type: "delta", content: delta })}\n\n`);
         });
 
+        const cleanupSubscriptions = () => {
+            unsubscribeAllEvents();
+            unsubscribeDelta();
+            unsubscribeToolStart();
+            unsubscribeToolEnd();
+            unsubscribeAgentStart();
+            unsubscribeAgentEnd();
+        };
+
         const onClose = () => {
             if (!completed) {
                 log.warn("Client disconnected");
-                unsubscribeDelta();
+                cleanupSubscriptions();
                 req.off("close", onClose);
                 session?.destroy().catch(() => {});
                 client?.stop().catch(() => {});
@@ -518,11 +606,11 @@ app.post("/chat", async (req: Request, res: Response) => {
         };
         req.on("close", onClose);
 
-        // Send message and wait for full response
-        await session.sendAndWait({ prompt: message });
+        // Send message and wait for full response (5 min timeout for MCP tool operations)
+        await session.sendAndWait({ prompt: message }, 300_000);
 
         completed = true;
-        unsubscribeDelta();
+        cleanupSubscriptions();
         req.off("close", onClose);
 
         const duration = Date.now() - startTime;
@@ -573,7 +661,7 @@ app.post("/chat/sync", async (req: Request, res: Response) => {
         return;
     }
 
-    const model = requestedModel || "gpt-4.1";
+    const model = requestedModel || "gpt-5.2";
     const adoToken = req.headers["x-ado-token"] as string | undefined;
 
     let client: any = null;
@@ -588,6 +676,9 @@ app.post("/chat/sync", async (req: Request, res: Response) => {
         client = new ClientClass({ githubToken });
         await client.start();
 
+        // Create per-request tools that capture the user's ADO token
+        const adoTools = adoToken ? await createAdoProjectTools(adoToken) : [];
+
         let sessionId: string;
 
         if (existing) {
@@ -598,6 +689,8 @@ app.post("/chat/sync", async (req: Request, res: Response) => {
                 onPermissionRequest: _approveAll,
                 systemMessage: { content: getSystemMessage(language) },
                 mcpServers: mcpConfig,
+                customAgents: [quickstartsExpertAgent],
+                tools: adoTools,
             });
             existing.lastActivity = Date.now();
         } else {
@@ -609,11 +702,13 @@ app.post("/chat/sync", async (req: Request, res: Response) => {
                 onPermissionRequest: _approveAll,
                 systemMessage: { content: getSystemMessage(language) },
                 mcpServers: mcpConfig,
+                customAgents: [quickstartsExpertAgent],
+                tools: adoTools,
             });
             userSessionIds.set(key, { sessionId, lastActivity: Date.now() });
         }
 
-        const response = await session.sendAndWait({ prompt: message });
+        const response = await session.sendAndWait({ prompt: message }, 300_000);
         const duration = Date.now() - startTime;
 
         const content = response?.data?.content || "";
