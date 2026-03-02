@@ -29,6 +29,21 @@ npm install
 
 ### Desarrollo
 
+Para ejecutar la API (servidor proxy) y la extensión (webpack-dev-server) **al mismo tiempo**:
+
+```bash
+npm run dev
+```
+
+Esto usa `concurrently` para lanzar ambos procesos en una sola terminal:
+
+- **API** → `npm run server:dev` (servidor Express con hot reload via `tsx watch`)
+- **EXT** → `npm run start:dev` (webpack-dev-server en `https://localhost:3000`)
+
+> **Nota**: Antes de ejecutar, asegúrate de haber instalado también las dependencias del servidor con `npm run server:install`.
+
+Si solo necesitas compilar la extensión sin levantar el servidor:
+
 ```bash
 npm run build:dev
 ```
@@ -53,6 +68,9 @@ Esto genera un archivo `.vsix` que puede subirse al [Visual Studio Marketplace](
 | `npm run package-extension` | Empaqueta la extensión en un archivo `.vsix`    |
 | `npm run publish-extension` | Publica la extensión en el Marketplace          |
 | `npm run start:dev`         | Inicia el servidor de desarrollo con hot reload |
+| `npm run dev`               | Ejecuta API + extensión simultáneamente          |
+| `npm run server:install`    | Instala dependencias del servidor (API)          |
+| `npm run server:dev`        | Inicia solo la API en modo desarrollo            |
 
 ## 🏗️ Estructura del proyecto
 
@@ -145,10 +163,13 @@ Esto inicia webpack-dev-server en `https://localhost:3000` con HTTPS.
 ### Flujo de trabajo recomendado
 
 ```bash
-# Terminal 1: Servidor de desarrollo (déjalo corriendo)
-npm run start:dev
+# Instalar dependencias (solo la primera vez o cuando cambien)
+npm install && npm run server:install
 
-# Terminal 2: Cuando necesites republicar el manifiesto
+# Arrancar API + extensión con un solo comando
+npm run dev
+
+# En otra terminal, si necesitas republicar el manifiesto
 source .env && npm run publish-extension:dev -- --token $AZURE_DEVOPS_PAT
 ```
 
