@@ -313,6 +313,8 @@ interface ICopilotChatState {
   models: CopilotModel[];
   selectedModel: string;
   modelsLoading: boolean;
+  // Tool progress state
+  toolAction: string | null;
 }
 
 class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
@@ -343,6 +345,8 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
       models: [],
       selectedModel: "gpt-4.1",
       modelsLoading: false,
+      // Tool progress
+      toolAction: null,
     };
   }
 
@@ -635,6 +639,7 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
       inputValue: "",
       isLoading: true,
       streamingMessageId: assistantMessageId,
+      toolAction: null,
     });
 
     // Reset textarea height
@@ -661,6 +666,7 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
           this.setState({
             isLoading: false,
             streamingMessageId: null,
+            toolAction: null,
           });
         },
         // onError: handle errors
@@ -673,6 +679,7 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
             ),
             isLoading: false,
             streamingMessageId: null,
+            toolAction: null,
           }));
           // If auth error, reset auth state
           if (error.message.includes("expired") || error.message.includes("re-authenticate")) {
@@ -680,6 +687,13 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
           }
         },
         this.state.selectedModel,
+        // onProgress: show tool execution status
+        (action, detail) => {
+          const label = this.getToolActionLabel(action, detail);
+          if (label) {
+            this.setState({ toolAction: label });
+          }
+        },
       );
     } catch (error) {
       const errorMessage =
@@ -692,9 +706,52 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
         ),
         isLoading: false,
         streamingMessageId: null,
+        toolAction: null,
       }));
     }
   };
+
+  /**
+   * Maps tool/agent progress events to user-friendly labels
+   */
+  private getToolActionLabel(action: string, detail: string): string | null {
+    // Well-known MCP tool names → friendly labels
+    const TOOL_LABELS: Record<string, string> = {
+      // ADO MCP tools
+      "list_repos": "📋 Listando repositorios...",
+      "get_repo": "📂 Leyendo repositorio...",
+      "list_projects": "🏢 Listando proyectos...",
+      "create_project": "🏗️ Creando proyecto...",
+      "create_repo": "📦 Creando repositorio...",
+      "search_code": "🔍 Buscando código...",
+      "get_work_items": "📝 Consultando work items...",
+      "create_work_item": "📝 Creando work item...",
+      "get_pipelines": "🔄 Consultando pipelines...",
+      "create_pipeline": "🔄 Creando pipeline...",
+      // Custom ADO project tools
+      "create_ado_project": "🏗️ Creando proyecto en Azure DevOps...",
+      "create_ado_repo": "📦 Creando repositorio...",
+      "import_quickstart_repo": "📥 Importando plantilla Quickstart...",
+      "setup_ado_pipeline": "⚙️ Configurando pipeline CI/CD...",
+    };
+
+    switch (action) {
+      case "tool_start": {
+        const label = TOOL_LABELS[detail];
+        if (label) return label;
+        // Generic fallback with tool name
+        return `🔧 ${detail}...`;
+      }
+      case "tool_end":
+        return null; // Clear on completion — let next tool or delta take over
+      case "agent_start":
+        return `🤖 ${detail} trabajando...`;
+      case "agent_end":
+        return null;
+      default:
+        return null;
+    }
+  }
 
   private handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
@@ -781,6 +838,7 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
       selectedModel,
       modelsLoading,
       streamingMessageId,
+      toolAction,
     } = this.state;
     const langCode = selectedLanguage.code;
 
@@ -966,6 +1024,9 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
                         <span></span>
                         <span></span>
                       </div>
+                      {toolAction && (
+                        <div className="tool-action-label">{toolAction}</div>
+                      )}
                     </div>
                   </div>
                 )}

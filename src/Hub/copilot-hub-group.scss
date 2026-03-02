@@ -220,6 +220,17 @@
   }
 }
 
+.tool-action-label {
+  font-size: 12px;
+  color: var(--text-secondary-color, #605e5c);
+  padding: 2px 4px 4px;
+  animation: fadeIn 0.3s ease-in-out;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;

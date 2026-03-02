@@ -2,7 +2,7 @@
     "manifestVersion": 1,
     "id": "github-copilot-chat-dev",
     "publisher": "returngisorg",
-    "version": "0.0.12",
+    "version": "0.0.15",
     "name": "GitHub Copilot Chat [DEV]",
     "description": "GitHub Copilot Chat for Azure DevOps - Development version",
     "baseUri": "https://localhost:3000",
@@ -16,11 +16,11 @@
     ],
     "scopes": [
         "vso.work",
-        "vso.code",
+        "vso.code_write",
         "vso.build",
         "vso.release",
         "vso.test",
-        "vso.project"
+        "vso.project_manage"
     ],
     "icons": {
         "default": "logo.png"
