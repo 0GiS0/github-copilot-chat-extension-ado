@@ -780,6 +780,7 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
       models,
       selectedModel,
       modelsLoading,
+      streamingMessageId,
     } = this.state;
     const langCode = selectedLanguage.code;
 
@@ -938,7 +939,13 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
             <div className="main-layout">
               <div className="chat-container">
                 <div className="messages-container">
-                {messages.map((message) => (
+                {messages.map((message) => {
+                  // Hide the streaming placeholder while it has no content yet
+                  // (the typing indicator below already shows the "thinking" state)
+                  if (message.id === streamingMessageId && !message.content) {
+                    return null;
+                  }
+                  return (
                   <div key={message.id} className={`message ${message.role}`}>
                     {this.renderAvatar(message.role)}
                     <div className="message-content">
@@ -948,7 +955,8 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
                 {isLoading && (
                   <div className="message assistant">
                     {this.renderAvatar("assistant")}
