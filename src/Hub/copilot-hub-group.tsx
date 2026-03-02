@@ -551,7 +551,23 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
   }
 
   private handleModelChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    this.setState({ selectedModel: event.target.value });
+    const newModel = event.target.value;
+    const { userName, selectedLanguage } = this.state;
+
+    // Reset the conversation session when model changes
+    copilotService.resetSession();
+
+    this.setState({
+      selectedModel: newModel,
+      messages: [
+        {
+          id: "welcome",
+          role: "assistant",
+          content: selectedLanguage.welcomeMessage(userName),
+          timestamp: new Date(),
+        },
+      ],
+    });
   };
 
   private scrollToBottom = () => {
@@ -886,26 +902,6 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
               )}
             </div>
 
-            {/* Model Selector (only when authenticated) */}
-            {isAuthenticated && models.length > 0 && (
-              <div className="model-selector-container">
-                <label className="model-selector-label">🤖</label>
-                <select
-                  className="model-selector"
-                  value={selectedModel}
-                  onChange={this.handleModelChange}
-                  disabled={isLoading || modelsLoading}
-                >
-                  {models.map((model) => (
-                    <option key={model.id} value={model.id}>
-                      {model.name} {model.premiumRequests > 1 ? `(${model.premiumRequests}x)` : ""}
-                    </option>
-                  ))}
-                </select>
-                {modelsLoading && <span className="model-loading">⏳</span>}
-              </div>
-            )}
-
             {/* GitHub Auth */}
             <div className="github-auth-container">
               {isAuthenticated ? (
@@ -1034,23 +1030,48 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
               </div>
 
               <div className="input-container">
-                <textarea
-                  ref={this.textareaRef}
-                  value={inputValue}
-                  onChange={this.handleInputChange}
-                  onKeyDown={this.handleKeyDown}
-                  placeholder={selectedLanguage.placeholder}
-                  className="chat-input"
-                  rows={1}
-                />
-                <Button
-                  className="send-button"
-                  primary={true}
-                  onClick={this.handleSendMessage}
-                  disabled={isLoading || !inputValue.trim()}
+                <div className="input-row">
+                  <textarea
+                    ref={this.textareaRef}
+                    value={inputValue}
+                    onChange={this.handleInputChange}
+                    onKeyDown={this.handleKeyDown}
+                    placeholder={selectedLanguage.placeholder}
+                    className="chat-input"
+                    rows={1}
+                  />
+                  <Button
+                    className="send-button"
+                    primary={true}
+                    onClick={this.handleSendMessage}
+                    disabled={isLoading || !inputValue.trim()}
                   iconProps={{ iconName: "Send" }}
                   ariaLabel="Enviar"
                 />
+                </div>
+                {isAuthenticated && (models.length > 0 || modelsLoading) && (
+                  <div className="input-bottom-bar">
+                    <div className="model-selector-container">
+                      <span className="model-selector-label">🤖</span>
+                      {modelsLoading ? (
+                        <span className="model-loading">⏳</span>
+                      ) : (
+                        <select
+                          className="model-selector"
+                          value={selectedModel}
+                          onChange={this.handleModelChange}
+                          disabled={isLoading}
+                        >
+                          {models.map((model) => (
+                            <option key={model.id} value={model.id}>
+                              {model.name}{model.premiumRequests > 1 ? ` (${model.premiumRequests}x)` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

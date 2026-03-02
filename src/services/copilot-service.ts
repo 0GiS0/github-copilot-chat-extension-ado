@@ -440,6 +440,14 @@ class CopilotService {
     }
 
     /**
+     * Reset the current conversation session (e.g. when switching models)
+     */
+    resetSession(): void {
+        this.sessionId = null;
+        console.log("[CopilotService] Session reset");
+    }
+
+    /**
      * Check if the service is initialized
      */
     isReady(): boolean {
