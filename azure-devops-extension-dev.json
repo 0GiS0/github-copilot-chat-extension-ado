@@ -14,6 +14,14 @@
             "id": "Microsoft.VisualStudio.Services"
         }
     ],
+    "scopes": [
+        "vso.work",
+        "vso.code",
+        "vso.build",
+        "vso.release",
+        "vso.test",
+        "vso.project"
+    ],
     "icons": {
         "default": "logo.png"
     },

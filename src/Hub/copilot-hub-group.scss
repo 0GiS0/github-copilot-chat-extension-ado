@@ -493,3 +493,263 @@
     font-size: 14px;
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🔐 GitHub Auth Styles
+// ═══════════════════════════════════════════════════════════════════════════════
+
+.top-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.github-auth-container {
+  margin-left: auto;
+}
+
+.github-auth-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: #24292f;
+  transition: all 0.2s;
+
+  &:hover {
+    background: #f6f8fa;
+    border-color: #1b1f2326;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  &.authenticated {
+    border-color: #2da44e;
+    color: #1a7f37;
+    background: #dafbe1;
+
+    &:hover {
+      background: #aceebb;
+    }
+  }
+
+  .github-icon {
+    font-size: 16px;
+  }
+
+  .github-auth-text {
+    white-space: nowrap;
+  }
+}
+
+.auth-dialog {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.auth-dialog-content {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 400px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+
+  h3 {
+    margin: 0 0 16px 0;
+    font-size: 20px;
+    color: #24292f;
+  }
+
+  p {
+    margin: 8px 0;
+    color: #57606a;
+    font-size: 14px;
+  }
+
+  a {
+    color: #0969da;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.auth-code {
+  display: inline-block;
+  padding: 12px 24px;
+  background: #f6f8fa;
+  border: 2px dashed #d0d7de;
+  border-radius: 8px;
+  font-size: 28px;
+  font-weight: 700;
+  font-family: monospace;
+  letter-spacing: 4px;
+  color: #0969da;
+  margin: 16px 0;
+  user-select: all;
+}
+
+.auth-waiting {
+  color: #bf8700 !important;
+  font-weight: 500;
+}
+
+.auth-cancel-button {
+  margin-top: 16px;
+  padding: 8px 24px;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  background: #f6f8fa;
+  cursor: pointer;
+  font-size: 14px;
+  color: #57606a;
+
+  &:hover {
+    background: #eaeef2;
+  }
+}
+
+.auth-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #fff8c5;
+  border: 1px solid #d4a72c;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #6a5300;
+}
+
+.auth-error-dismiss {
+  margin-left: auto;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: #6a5300;
+  font-size: 16px;
+  padding: 0 4px;
+
+  &:hover {
+    color: #3b2e00;
+  }
+}
+
+.auth-required-overlay {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-required-content {
+  text-align: center;
+  max-width: 400px;
+  padding: 40px;
+
+  .auth-copilot-icon {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 20px;
+  }
+
+  h2 {
+    margin: 0 0 12px 0;
+    font-size: 24px;
+    color: #24292f;
+  }
+
+  p {
+    margin: 0 0 8px 0;
+    color: #57606a;
+    font-size: 15px;
+  }
+
+  .auth-subtitle {
+    font-size: 13px;
+    color: #8b949e;
+    margin-bottom: 24px;
+  }
+}
+
+.github-login-button-large {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 32px;
+  border: none;
+  border-radius: 10px;
+  background: #24292f;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover {
+    background: #32383f;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🤖 Model Selector Styles
+// ═══════════════════════════════════════════════════════════════════════════════
+
+.model-selector-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.model-selector-label {
+  font-size: 14px;
+}
+
+.model-selector {
+  padding: 4px 8px;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  background: #ffffff;
+  font-size: 13px;
+  color: #24292f;
+  cursor: pointer;
+  max-width: 200px;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  &:focus {
+    outline: 2px solid #0969da;
+    outline-offset: -1px;
+  }
+}
+
+.model-loading {
+  font-size: 14px;
+}

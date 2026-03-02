@@ -4,13 +4,13 @@ import * as React from "react";
 import * as ReactDOM from "react-dom";
 import * as SDK from "azure-devops-extension-sdk";
 
-import { copilotService } from "../services/copilot-service";
+import { copilotService, CopilotModel } from "../services/copilot-service";
 
 import { Header, TitleSize } from "azure-devops-ui/Header";
 import { Page } from "azure-devops-ui/Page";
 import { Button } from "azure-devops-ui/Button";
 
-// Import Copilot icon
+// Import Copilot & GitHub icons
 import copilotIcon from "../../static/copilot-icon.png";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -303,11 +303,22 @@ interface ICopilotChatState {
   connectionError: string | null;
   selectedLanguage: ILanguage;
   isLanguageSelectorOpen: boolean;
+  // GitHub Auth state
+  isAuthenticated: boolean;
+  isAuthenticating: boolean;
+  authUserCode: string | null;
+  authVerificationUri: string | null;
+  authError: string | null;
+  // Model selector state
+  models: CopilotModel[];
+  selectedModel: string;
+  modelsLoading: boolean;
 }
 
 class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
   private messagesEndRef = React.createRef<HTMLDivElement>();
   private textareaRef = React.createRef<HTMLTextAreaElement>();
+  private pollInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(props: {}) {
     super(props);
@@ -322,6 +333,16 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
       connectionError: null,
       selectedLanguage: LANGUAGES[0], // Default to Spanish
       isLanguageSelectorOpen: false,
+      // GitHub Auth
+      isAuthenticated: copilotService.isAuthenticated(),
+      isAuthenticating: false,
+      authUserCode: null,
+      authVerificationUri: null,
+      authError: null,
+      // Models
+      models: [],
+      selectedModel: "gpt-4.1",
+      modelsLoading: false,
     };
   }
 
@@ -344,25 +365,190 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
       ],
     });
 
-    // Initialize Copilot service
+    // Get the Azure DevOps access token for the current user
+    try {
+      const adoToken = await SDK.getAccessToken();
+      copilotService.setAdoToken(adoToken);
+      console.log("[CopilotChatHub] ADO access token obtained");
+    } catch (error) {
+      console.warn("[CopilotChatHub] Failed to get ADO access token:", error);
+    }
+
+    // Initialize proxy connection
     this.initializeCopilot();
+
+    // If already authenticated (token in sessionStorage), verify it still works
+    if (copilotService.isAuthenticated()) {
+      console.log("[CopilotChatHub] Found existing token, verifying...");
+      const verification = await copilotService.verifyToken();
+      if (verification.valid) {
+        console.log(`[CopilotChatHub] Token is valid for: ${verification.login}`);
+        this.setState({ isAuthenticated: true });
+        this.loadModels();
+      } else {
+        console.warn("[CopilotChatHub] Stored token is invalid, clearing...");
+        copilotService.clearToken();
+        this.setState({ isAuthenticated: false });
+      }
+    }
+  }
+
+  public componentWillUnmount() {
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
+    }
   }
 
   private async initializeCopilot() {
     try {
       await copilotService.initialize();
       this.setState({ isConnected: true, connectionError: null });
-      console.log("[CopilotChatHub] Connected to Copilot CLI");
+      console.log("[CopilotChatHub] Connected to proxy server");
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Error desconocido";
       this.setState({
         isConnected: false,
-        connectionError: `No se pudo conectar con Copilot CLI: ${errorMessage}. Asegúrate de que esté ejecutándose con: copilot --server --port 4321`,
+        connectionError: `No se pudo conectar con el servidor proxy: ${errorMessage}. Asegúrate de que esté ejecutándose con: cd server && npm run dev`,
       });
       console.error("[CopilotChatHub] Failed to connect:", error);
     }
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 🔐 GitHub Authentication
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  private handleGitHubLogin = async () => {
+    this.setState({
+      isAuthenticating: true,
+      authError: null,
+      authUserCode: null,
+      authVerificationUri: null,
+    });
+
+    try {
+      const deviceCode = await copilotService.initiateDeviceFlow();
+
+      this.setState({
+        authUserCode: deviceCode.userCode,
+        authVerificationUri: deviceCode.verificationUri,
+      });
+
+      // Open GitHub verification page
+      window.open(deviceCode.verificationUri, "_blank");
+
+      // Start polling for token
+      const interval = (deviceCode.interval || 5) * 1000;
+      const pollFn = async () => {
+        try {
+          console.log("[CopilotChatHub] Polling for token...");
+          const result = await copilotService.pollForToken(deviceCode.deviceCode);
+          console.log(`[CopilotChatHub] Poll result: ${result.status}`);
+
+          switch (result.status) {
+            case "complete":
+              // Authentication successful!
+              console.log("[CopilotChatHub] Authentication complete! Clearing poll interval...");
+              if (this.pollInterval) {
+                clearInterval(this.pollInterval);
+                this.pollInterval = null;
+              }
+              // Verify token is working
+              const verification = await copilotService.verifyToken();
+              console.log(`[CopilotChatHub] Token verification:`, verification);
+
+              this.setState({
+                isAuthenticated: true,
+                isAuthenticating: false,
+                authUserCode: null,
+                authVerificationUri: null,
+                authError: null,
+              });
+              // Load models now
+              this.loadModels();
+              break;
+
+            case "expired":
+              if (this.pollInterval) {
+                clearInterval(this.pollInterval);
+                this.pollInterval = null;
+              }
+              this.setState({
+                isAuthenticating: false,
+                authError: "El código ha expirado. Intenta de nuevo.",
+                authUserCode: null,
+              });
+              break;
+
+            case "error":
+              if (this.pollInterval) {
+                clearInterval(this.pollInterval);
+                this.pollInterval = null;
+              }
+              this.setState({
+                isAuthenticating: false,
+                authError: result.error || "Error de autenticación",
+                authUserCode: null,
+              });
+              break;
+
+            case "slow_down":
+              // GitHub asks us to slow down - restart interval with longer delay
+              if (this.pollInterval) {
+                clearInterval(this.pollInterval);
+              }
+              const newInterval = (result.interval || 10) * 1000;
+              console.log(`[CopilotChatHub] Slowing down poll interval to ${newInterval}ms`);
+              this.pollInterval = setInterval(pollFn, newInterval);
+              break;
+
+            // "pending" - keep polling at current rate
+          }
+        } catch (error) {
+          console.error("[CopilotChatHub] Poll error:", error);
+        }
+      };
+
+      this.pollInterval = setInterval(pollFn, interval);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Error desconocido";
+      this.setState({
+        isAuthenticating: false,
+        authError: errorMessage,
+      });
+    }
+  };
+
+  private handleGitHubLogout = () => {
+    copilotService.clearToken();
+    this.setState({
+      isAuthenticated: false,
+      models: [],
+      selectedModel: "gpt-4.1",
+    });
+  };
+
+  private async loadModels() {
+    this.setState({ modelsLoading: true });
+    try {
+      const models = await copilotService.fetchModels();
+      const defaultModel = models.find((m) => m.id === "gpt-4.1");
+      this.setState({
+        models,
+        selectedModel: defaultModel ? defaultModel.id : models.length > 0 ? models[0].id : "gpt-4.1",
+        modelsLoading: false,
+      });
+    } catch (error) {
+      console.error("[CopilotChatHub] Failed to load models:", error);
+      this.setState({ modelsLoading: false });
+    }
+  }
+
+  private handleModelChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    this.setState({ selectedModel: event.target.value });
+  };
 
   private scrollToBottom = () => {
     this.messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -390,9 +576,26 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
   };
 
   private handleSendMessage = async () => {
-    const { inputValue, messages, isConnected } = this.state;
+    const { inputValue, messages, isConnected, isAuthenticated } = this.state;
 
     if (!inputValue.trim()) return;
+
+    // Check authentication
+    if (!isAuthenticated) {
+      this.setState({
+        messages: [
+          ...messages,
+          {
+            id: `error-${Date.now()}`,
+            role: "assistant",
+            content:
+              "⚠️ Necesitas iniciar sesión con GitHub primero. Haz clic en el botón 'Iniciar sesión con GitHub' arriba.",
+            timestamp: new Date(),
+          },
+        ],
+      });
+      return;
+    }
 
     // Check connection status
     if (!isConnected) {
@@ -403,7 +606,7 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
             id: `error-${Date.now()}`,
             role: "assistant",
             content:
-              "⚠️ No hay conexión con Copilot CLI. Asegúrate de ejecutar: `copilot --server --port 4321`",
+              "⚠️ No hay conexión con el servidor proxy. Asegúrate de ejecutar: `cd server && npm run dev`",
             timestamp: new Date(),
           },
         ],
@@ -471,7 +674,12 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
             isLoading: false,
             streamingMessageId: null,
           }));
+          // If auth error, reset auth state
+          if (error.message.includes("expired") || error.message.includes("re-authenticate")) {
+            this.setState({ isAuthenticated: false });
+          }
         },
+        this.state.selectedModel,
       );
     } catch (error) {
       const errorMessage =
@@ -564,6 +772,14 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
       isLoading,
       selectedLanguage,
       isLanguageSelectorOpen,
+      isAuthenticated,
+      isAuthenticating,
+      authUserCode,
+      authVerificationUri,
+      authError,
+      models,
+      selectedModel,
+      modelsLoading,
     } = this.state;
     const langCode = selectedLanguage.code;
 
@@ -576,42 +792,152 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
         />
 
         <div className="page-content flex-grow">
-          {/* Language Selector */}
-          <div className="language-selector-container">
-            <button
-              className="language-selector-button"
-              onClick={this.toggleLanguageSelector}
-              aria-label="Select language"
-            >
-              <span className="language-flag">{selectedLanguage.flag}</span>
-              <span className="language-name">{selectedLanguage.name}</span>
-              <span className="language-arrow">
-                {isLanguageSelectorOpen ? "▲" : "▼"}
-              </span>
-            </button>
+          {/* Top bar: Language Selector + Auth + Model Selector */}
+          <div className="top-bar-container">
+            {/* Language Selector */}
+            <div className="language-selector-container">
+              <button
+                className="language-selector-button"
+                onClick={this.toggleLanguageSelector}
+                aria-label="Select language"
+              >
+                <span className="language-flag">{selectedLanguage.flag}</span>
+                <span className="language-name">{selectedLanguage.name}</span>
+                <span className="language-arrow">
+                  {isLanguageSelectorOpen ? "▲" : "▼"}
+                </span>
+              </button>
 
-            {isLanguageSelectorOpen && (
-              <div className="language-dropdown">
-                {LANGUAGES.map((lang) => (
-                  <button
-                    key={lang.code}
-                    className={`language-option ${lang.code === selectedLanguage.code ? "selected" : ""}`}
-                    onClick={() => this.handleLanguageChange(lang)}
-                  >
-                    <span className="language-flag">{lang.flag}</span>
-                    <span className="language-name">{lang.name}</span>
-                    {lang.code === selectedLanguage.code && (
-                      <span className="language-check">✓</span>
-                    )}
-                  </button>
-                ))}
+              {isLanguageSelectorOpen && (
+                <div className="language-dropdown">
+                  {LANGUAGES.map((lang) => (
+                    <button
+                      key={lang.code}
+                      className={`language-option ${lang.code === selectedLanguage.code ? "selected" : ""}`}
+                      onClick={() => this.handleLanguageChange(lang)}
+                    >
+                      <span className="language-flag">{lang.flag}</span>
+                      <span className="language-name">{lang.name}</span>
+                      {lang.code === selectedLanguage.code && (
+                        <span className="language-check">✓</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Model Selector (only when authenticated) */}
+            {isAuthenticated && models.length > 0 && (
+              <div className="model-selector-container">
+                <label className="model-selector-label">🤖</label>
+                <select
+                  className="model-selector"
+                  value={selectedModel}
+                  onChange={this.handleModelChange}
+                  disabled={isLoading || modelsLoading}
+                >
+                  {models.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.name} {model.premiumRequests > 1 ? `(${model.premiumRequests}x)` : ""}
+                    </option>
+                  ))}
+                </select>
+                {modelsLoading && <span className="model-loading">⏳</span>}
               </div>
             )}
+
+            {/* GitHub Auth */}
+            <div className="github-auth-container">
+              {isAuthenticated ? (
+                <button
+                  className="github-auth-button authenticated"
+                  onClick={this.handleGitHubLogout}
+                  title="Cerrar sesión de GitHub"
+                >
+                  <span className="github-icon">🔓</span>
+                  <span className="github-auth-text">GitHub ✓</span>
+                </button>
+              ) : (
+                <button
+                  className="github-auth-button"
+                  onClick={this.handleGitHubLogin}
+                  disabled={isAuthenticating}
+                >
+                  <span className="github-icon">🔐</span>
+                  <span className="github-auth-text">
+                    {isAuthenticating ? "Autenticando..." : "Iniciar sesión con GitHub"}
+                  </span>
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="main-layout">
-            <div className="chat-container">
-              <div className="messages-container">
+          {/* Device Flow Auth Dialog */}
+          {isAuthenticating && authUserCode && (
+            <div className="auth-dialog">
+              <div className="auth-dialog-content">
+                <h3>🔐 Autenticación con GitHub</h3>
+                <p>Introduce este código en GitHub:</p>
+                <div className="auth-code">{authUserCode}</div>
+                <p>
+                  Se ha abierto una ventana con{" "}
+                  <a href={authVerificationUri || "#"} target="_blank" rel="noopener noreferrer">
+                    {authVerificationUri}
+                  </a>
+                </p>
+                <p className="auth-waiting">⏳ Esperando autenticación...</p>
+                <button
+                  className="auth-cancel-button"
+                  onClick={() => {
+                    if (this.pollInterval) {
+                      clearInterval(this.pollInterval);
+                      this.pollInterval = null;
+                    }
+                    this.setState({
+                      isAuthenticating: false,
+                      authUserCode: null,
+                      authVerificationUri: null,
+                    });
+                  }}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Auth Error */}
+          {authError && (
+            <div className="auth-error">
+              ⚠️ {authError}
+              <button onClick={() => this.setState({ authError: null })} className="auth-error-dismiss">✕</button>
+            </div>
+          )}
+
+          {/* Not authenticated overlay */}
+          {!isAuthenticated && !isAuthenticating && (
+            <div className="auth-required-overlay">
+              <div className="auth-required-content">
+                <img src={copilotIcon} alt="Copilot" className="auth-copilot-icon" />
+                <h2>GitHub Copilot Chat</h2>
+                <p>Para usar el chat, primero necesitas iniciar sesión con tu cuenta de GitHub.</p>
+                <p className="auth-subtitle">Cada usuario interactúa con Copilot usando su propia cuenta.</p>
+                <button
+                  className="github-login-button-large"
+                  onClick={this.handleGitHubLogin}
+                >
+                  <span>🔐</span> Iniciar sesión con GitHub
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Main chat (only visible when authenticated) */}
+          {isAuthenticated && (
+            <div className="main-layout">
+              <div className="chat-container">
+                <div className="messages-container">
                 {messages.map((message) => (
                   <div key={message.id} className={`message ${message.role}`}>
                     {this.renderAvatar(message.role)}
@@ -688,7 +1014,8 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
                 ))}
               </div>
             </div>
-          </div>
+            </div>
+          )}
         </div>
       </Page>
     );
