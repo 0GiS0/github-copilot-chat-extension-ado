@@ -87,7 +87,54 @@ app.use(cors({
 app.use(express.json());
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 🔐 GitHub OAuth Device Flow endpoints
+// � Per-user session management
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// We store only the sessionId per user — the CopilotClient is created fresh
+// per HTTP request (and destroyed after), matching the SDK's intended pattern.
+// Session continuity (conversation context) is maintained by the SDK server-side
+// via the sessionId; the local client is just a thin wrapper.
+const userSessionIds = new Map<string, { sessionId: string; lastActivity: number }>();
+
+// Simple hash to use as map key (avoid storing full tokens)
+function tokenKey(token: string): string {
+    return token.substring(0, 16);
+}
+
+// Cleanup stale session IDs after 30 minutes
+const SESSION_TTL_MS = 30 * 60 * 1000;
+setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of userSessionIds.entries()) {
+        if (now - entry.lastActivity > SESSION_TTL_MS) {
+            log.info(`Cleaning up stale session ID for user ${key.substring(0, 6)}...`);
+            userSessionIds.delete(key);
+        }
+    }
+}, 5 * 60 * 1000); // Check every 5 minutes
+
+function getMcpConfig(adoToken?: string) {
+    return {
+        ado: {
+            type: "local" as const,
+            command: "npx",
+            tools: ["*"],
+            args: [
+                "-y",
+                "@azure-devops/mcp",
+                "returngisorg",
+                "--authentication",
+                "envvar",
+            ],
+            env: {
+                ADO_MCP_AUTH_TOKEN: adoToken || process.env.ADO_MCP_AUTH_TOKEN || "",
+            },
+        },
+    };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// �🔐 GitHub OAuth Device Flow endpoints
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
@@ -358,7 +405,7 @@ app.post("/chat", async (req: Request, res: Response) => {
         return;
     }
 
-    const { message, sessionId: incomingSessionId, language = "es", model: requestedModel } = req.body;
+    const { message, language = "es", model: requestedModel } = req.body;
     const adoToken = req.headers["x-ado-token"] as string | undefined;
     const startTime = Date.now();
 
@@ -371,9 +418,8 @@ app.post("/chat", async (req: Request, res: Response) => {
     }
 
     const model = requestedModel || "gpt-4.1";
-    const sessionId = incomingSessionId || `ado-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-    log.question(sessionId, message);
+    log.question("pending", message);
 
     // Set up SSE headers
     res.setHeader("Content-Type", "text/event-stream");
@@ -382,45 +428,68 @@ app.post("/chat", async (req: Request, res: Response) => {
     res.setHeader("X-Accel-Buffering", "no");
     res.flushHeaders();
 
-    let client: any;
-    let session: any;
+    // Fresh client per request — avoids accumulated event listeners
+    let client: any = null;
+    let session: any = null;
 
     try {
-        // Create a per-request client with the USER's GitHub token
+        const key = tokenKey(githubToken);
+        const existing = userSessionIds.get(key);
+        const mcpConfig = getMcpConfig(adoToken);
+
         const ClientClass = await getCopilotClient();
         client = new ClientClass({ githubToken });
         await client.start();
 
-        log.copilot(`Client started for user (model: ${model})`);
+        let sessionId: string;
+        let isNew: boolean;
 
-        session = await client.createSession({
-            sessionId,
-            model,
-            streaming: true,
-            onPermissionRequest: _approveAll,
-            systemMessage: {
-                content: getSystemMessage(language),
-            },
-            mcpServers: {
-                ado: {
-                    "type": "local",
-                    "command": "npx",
-                    "tools": ["*"],
-                    "args": [
-                        "-y",
-                        "@azure-devops/mcp",
-                        "returngisorg",
-                        "--authentication",
-                        "envvar"
-                    ],
-                    "env": {
-                        "ADO_MCP_AUTH_TOKEN": adoToken || process.env.ADO_MCP_AUTH_TOKEN || ""
-                    }
-                }
+        if (existing) {
+            try {
+                sessionId = existing.sessionId;
+                session = await client.resumeSession(sessionId, {
+                    model,
+                    streaming: true,
+                    onPermissionRequest: _approveAll,
+                    systemMessage: { content: getSystemMessage(language) },
+                    mcpServers: mcpConfig,
+                });
+                existing.lastActivity = Date.now();
+                isNew = false;
+                log.session("resumed", sessionId);
+            } catch (err) {
+                log.warn(`Failed to resume session ${existing.sessionId}, creating new one`);
+                userSessionIds.delete(key);
+                // Create fresh session below
+                sessionId = `ado-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+                session = await client.createSession({
+                    sessionId,
+                    model,
+                    streaming: true,
+                    onPermissionRequest: _approveAll,
+                    systemMessage: { content: getSystemMessage(language) },
+                    mcpServers: mcpConfig,
+                });
+                userSessionIds.set(key, { sessionId, lastActivity: Date.now() });
+                isNew = true;
+                log.session("created", sessionId);
             }
-        });
+        } else {
+            sessionId = `ado-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            session = await client.createSession({
+                sessionId,
+                model,
+                streaming: true,
+                onPermissionRequest: _approveAll,
+                systemMessage: { content: getSystemMessage(language) },
+                mcpServers: mcpConfig,
+            });
+            userSessionIds.set(key, { sessionId, lastActivity: Date.now() });
+            isNew = true;
+            log.session("created", sessionId);
+        }
 
-        log.session("created", sessionId);
+        log.copilot(`Client ready for user (model: ${model}, ${isNew ? "new" : "resumed"} session)`);
         log.streaming(sessionId);
 
         // Send session ID to client
@@ -461,7 +530,7 @@ app.post("/chat", async (req: Request, res: Response) => {
         log.complete(sessionId, duration);
         log.debug(`Chunks: ${chunkCount} | Chars: ${fullContent.length}`);
 
-        // Cleanup
+        // Destroy session and stop client — session will be resumed by ID next time
         await session.destroy();
         await client.stop();
 
@@ -472,12 +541,12 @@ app.post("/chat", async (req: Request, res: Response) => {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
         log.error(`Chat error: ${errorMessage}`);
 
-        if (session) {
-            try { await session.destroy(); } catch { /* ignore */ }
-        }
-        if (client) {
-            try { await client.stop(); } catch { /* ignore */ }
-        }
+        // On error, clean up and reset session so next request starts fresh
+        const key = tokenKey(githubToken);
+        userSessionIds.delete(key);
+
+        try { if (session) await session.destroy(); } catch { /* ignore */ }
+        try { if (client) await client.stop(); } catch { /* ignore */ }
 
         res.write(`data: ${JSON.stringify({ type: "error", error: errorMessage, resetSession: true })}\n\n`);
         res.end();
@@ -505,22 +574,44 @@ app.post("/chat/sync", async (req: Request, res: Response) => {
     }
 
     const model = requestedModel || "gpt-4.1";
-    let client: any;
-    let session: any;
+    const adoToken = req.headers["x-ado-token"] as string | undefined;
+
+    let client: any = null;
+    let session: any = null;
 
     try {
+        const key = tokenKey(githubToken);
+        const existing = userSessionIds.get(key);
+        const mcpConfig = getMcpConfig(adoToken);
+
         const ClientClass = await getCopilotClient();
         client = new ClientClass({ githubToken });
         await client.start();
 
-        session = await client.createSession({
-            model,
-            streaming: true,
-            onPermissionRequest: _approveAll,
-            systemMessage: {
-                content: getSystemMessage(language),
-            },
-        });
+        let sessionId: string;
+
+        if (existing) {
+            sessionId = existing.sessionId;
+            session = await client.resumeSession(sessionId, {
+                model,
+                streaming: true,
+                onPermissionRequest: _approveAll,
+                systemMessage: { content: getSystemMessage(language) },
+                mcpServers: mcpConfig,
+            });
+            existing.lastActivity = Date.now();
+        } else {
+            sessionId = `ado-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            session = await client.createSession({
+                sessionId,
+                model,
+                streaming: true,
+                onPermissionRequest: _approveAll,
+                systemMessage: { content: getSystemMessage(language) },
+                mcpServers: mcpConfig,
+            });
+            userSessionIds.set(key, { sessionId, lastActivity: Date.now() });
+        }
 
         const response = await session.sendAndWait({ prompt: message });
         const duration = Date.now() - startTime;
@@ -537,12 +628,12 @@ app.post("/chat/sync", async (req: Request, res: Response) => {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
         log.error(`Sync chat error: ${errorMessage}`);
 
-        if (session) {
-            try { await session.destroy(); } catch { /* ignore */ }
-        }
-        if (client) {
-            try { await client.stop(); } catch { /* ignore */ }
-        }
+        // Clean up and reset session on error
+        const key = tokenKey(githubToken);
+        userSessionIds.delete(key);
+
+        try { if (session) await session.destroy(); } catch { /* ignore */ }
+        try { if (client) await client.stop(); } catch { /* ignore */ }
 
         res.status(500).json({ error: errorMessage });
     }
@@ -568,6 +659,10 @@ app.listen(PORT, () => {
 process.on("SIGINT", async () => {
     console.log("");
     log.warn("Apagando servidor...");
+
+    // Clear stored session IDs
+    userSessionIds.clear();
+
     log.success("¡Hasta pronto! 👋");
     process.exit(0);
 });
