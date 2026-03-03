@@ -313,6 +313,7 @@ interface ICopilotChatState {
   models: CopilotModel[];
   selectedModel: string;
   modelsLoading: boolean;
+  isModelSelectorOpen: boolean;
   // Tool progress state
   toolAction: string | null;
 }
@@ -320,6 +321,7 @@ interface ICopilotChatState {
 class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
   private messagesEndRef = React.createRef<HTMLDivElement>();
   private textareaRef = React.createRef<HTMLTextAreaElement>();
+  private modelSelectorRef = React.createRef<HTMLDivElement>();
   private pollInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(props: {}) {
@@ -343,8 +345,9 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
       authError: null,
       // Models
       models: [],
-      selectedModel: "gpt-4.1",
+      selectedModel: "gpt-5.2",
       modelsLoading: false,
+      isModelSelectorOpen: false,
       // Tool progress
       toolAction: null,
     };
@@ -378,6 +381,9 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
       console.warn("[CopilotChatHub] Failed to get ADO access token:", error);
     }
 
+    // Close model dropdown on outside click
+    document.addEventListener("mousedown", this.handleClickOutside);
+
     // Initialize proxy connection
     this.initializeCopilot();
 
@@ -398,10 +404,21 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
   }
 
   public componentWillUnmount() {
+    document.removeEventListener("mousedown", this.handleClickOutside);
     if (this.pollInterval) {
       clearInterval(this.pollInterval);
     }
   }
+
+  private handleClickOutside = (event: MouseEvent) => {
+    if (
+      this.state.isModelSelectorOpen &&
+      this.modelSelectorRef.current &&
+      !this.modelSelectorRef.current.contains(event.target as Node)
+    ) {
+      this.setState({ isModelSelectorOpen: false });
+    }
+  };
 
   private async initializeCopilot() {
     try {
@@ -530,7 +547,7 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
     this.setState({
       isAuthenticated: false,
       models: [],
-      selectedModel: "gpt-4.1",
+      selectedModel: "gpt-5.2",
     });
   };
 
@@ -538,10 +555,10 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
     this.setState({ modelsLoading: true });
     try {
       const models = await copilotService.fetchModels();
-      const defaultModel = models.find((m) => m.id === "gpt-4.1");
+      const defaultModel = models.find((m) => m.id === "gpt-5.2");
       this.setState({
         models,
-        selectedModel: defaultModel ? defaultModel.id : models.length > 0 ? models[0].id : "gpt-4.1",
+        selectedModel: defaultModel ? defaultModel.id : models.length > 0 ? models[0].id : "gpt-5.2",
         modelsLoading: false,
       });
     } catch (error) {
@@ -550,15 +567,21 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
     }
   }
 
-  private handleModelChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const newModel = event.target.value;
+  private toggleModelSelector = () => {
+    this.setState((prevState) => ({
+      isModelSelectorOpen: !prevState.isModelSelectorOpen,
+    }));
+  };
+
+  private handleModelSelect = (modelId: string) => {
     const { userName, selectedLanguage } = this.state;
 
     // Reset the conversation session when model changes
     copilotService.resetSession();
 
     this.setState({
-      selectedModel: newModel,
+      selectedModel: modelId,
+      isModelSelectorOpen: false,
       messages: [
         {
           id: "welcome",
@@ -853,6 +876,7 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
       models,
       selectedModel,
       modelsLoading,
+      isModelSelectorOpen,
       streamingMessageId,
       toolAction,
     } = this.state;
@@ -1051,23 +1075,45 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
                 </div>
                 {isAuthenticated && (models.length > 0 || modelsLoading) && (
                   <div className="input-bottom-bar">
-                    <div className="model-selector-container">
-                      <span className="model-selector-label">🤖</span>
+                    <div className="model-selector-container" ref={this.modelSelectorRef}>
                       {modelsLoading ? (
                         <span className="model-loading">⏳</span>
                       ) : (
-                        <select
-                          className="model-selector"
-                          value={selectedModel}
-                          onChange={this.handleModelChange}
-                          disabled={isLoading}
-                        >
-                          {models.map((model) => (
-                            <option key={model.id} value={model.id}>
-                              {model.name}{model.premiumRequests > 1 ? ` (${model.premiumRequests}x)` : ""}
-                            </option>
-                          ))}
-                        </select>
+                        <>
+                          <button
+                            className="model-selector-button"
+                            onClick={this.toggleModelSelector}
+                            disabled={isLoading}
+                            aria-label="Select model"
+                          >
+                            <span className="model-selector-icon">🤖</span>
+                            <span className="model-selector-name">
+                              {models.find((m) => m.id === selectedModel)?.name || selectedModel}
+                            </span>
+                            <span className="model-selector-arrow">
+                              {isModelSelectorOpen ? "▲" : "▼"}
+                            </span>
+                          </button>
+                          {isModelSelectorOpen && (
+                            <div className="model-dropdown">
+                              {models.map((model) => (
+                                <button
+                                  key={model.id}
+                                  className={`model-option ${model.id === selectedModel ? "selected" : ""}`}
+                                  onClick={() => this.handleModelSelect(model.id)}
+                                >
+                                  <span className="model-option-name">{model.name}</span>
+                                  {model.premiumRequests > 1 && (
+                                    <span className="model-option-badge">{model.premiumRequests}x</span>
+                                  )}
+                                  {model.id === selectedModel && (
+                                    <span className="model-option-check">✓</span>
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>

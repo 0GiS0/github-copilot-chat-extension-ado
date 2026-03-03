@@ -744,39 +744,132 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 .model-selector-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.model-selector-button {
   display: flex;
   align-items: center;
   gap: 6px;
-}
-
-.model-selector-label {
-  font-size: 13px;
-}
-
-.model-selector {
-  padding: 3px 8px;
-  border: 1px solid var(--palette-neutral-20, #e1dfdd);
-  border-radius: 12px;
+  padding: 4px 12px;
   background: var(--palette-neutral-4, #f8f8f8);
-  font-size: 12px;
-  color: var(--text-primary-color, #24292f);
+  border: 1px solid var(--palette-neutral-20, #e1dfdd);
+  border-radius: 16px;
   cursor: pointer;
-  max-width: 220px;
-  transition: border-color 0.2s ease;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  font-size: 12px;
+
+  &:hover:not(:disabled) {
+    background: var(--palette-neutral-8, #f3f2f1);
+    border-color: var(--palette-neutral-30, #c8c8c8);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  }
 
   &:disabled {
     opacity: 0.6;
     cursor: not-allowed;
   }
 
-  &:hover:not(:disabled) {
-    border-color: var(--palette-neutral-30, #c8c8c8);
+  .model-selector-icon {
+    font-size: 14px;
+    line-height: 1;
   }
 
-  &:focus {
-    outline: 2px solid var(--communication-background, #0078d4);
-    outline-offset: -1px;
+  .model-selector-name {
+    font-weight: 500;
+    color: var(--text-primary-color, #323130);
+    max-width: 160px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
+
+  .model-selector-arrow {
+    font-size: 8px;
+    color: var(--text-secondary-color, #605e5c);
+    transition: transform 0.2s ease;
+  }
+}
+
+.model-dropdown {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  min-width: 220px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: #ffffff;
+  border: 1px solid var(--palette-neutral-20, #e1dfdd);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  z-index: 200;
+  animation: modelDropdownFadeIn 0.2s ease;
+
+  @keyframes modelDropdownFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+.model-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
+
+  &:hover {
+    background: var(--palette-neutral-8, #f3f2f1);
+  }
+
+  &.selected {
+    background: linear-gradient(135deg, #e6f2ff 0%, #d9ebff 100%);
+
+    .model-option-name {
+      color: #0078d4;
+      font-weight: 600;
+    }
+  }
+
+  &:not(:last-child) {
+    border-bottom: 1px solid var(--palette-neutral-10, #edebe9);
+  }
+}
+
+.model-option-name {
+  flex: 1;
+  color: var(--text-primary-color, #323130);
+}
+
+.model-option-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+  color: #e65100;
+  border-radius: 8px;
+}
+
+.model-option-check {
+  color: #0078d4;
+  font-weight: 700;
+  font-size: 14px;
 }
 
 .model-loading {
