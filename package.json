@@ -54,7 +54,9 @@
     "azure-devops-extension-sdk": "^4.2.0",
     "azure-devops-ui": "^2.167.63",
     "react": "~16.13.1",
-    "react-dom": "~16.13.1"
+    "react-dom": "~16.13.1",
+    "react-markdown": "^6.0.3",
+    "remark-gfm": "^1.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.21.8",

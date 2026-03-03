@@ -3,6 +3,8 @@ import "./copilot-hub-group.scss";
 import * as React from "react";
 import * as ReactDOM from "react-dom";
 import * as SDK from "azure-devops-extension-sdk";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import { copilotService, CopilotModel } from "../services/copilot-service";
 
@@ -1038,7 +1040,15 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
                   <div key={message.id} className={`message ${message.role}`}>
                     {this.renderAvatar(message.role)}
                     <div className="message-content">
-                      <div className="message-text">{message.content}</div>
+                      <div className="message-text">
+                        {message.role === "assistant" ? (
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {message.content}
+                          </ReactMarkdown>
+                        ) : (
+                          message.content
+                        )}
+                      </div>
                       <div className="message-time">
                         {message.timestamp.toLocaleTimeString()}
                       </div>
