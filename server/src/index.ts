@@ -353,7 +353,25 @@ function getSystemMessage(language: string, adoContext?: AdoContext): string {
         if (adoContext.teamName) {
             parts.push(`- **Equipo actual:** ${adoContext.teamName}`);
         }
-        contextSection = `\n\n## Contexto de navegación del usuario\n\nEl usuario está navegando actualmente en:\n${parts.join("\n")}\n\nCuando el usuario pregunte sobre "este proyecto", "el proyecto actual", "dónde estoy" o similares, usa esta información para dar respuestas contextualizadas. Puedes usar las herramientas de Azure DevOps para obtener más detalles del proyecto si es necesario.`;
+        contextSection = `
+
+## Contexto de navegación del usuario
+
+El usuario está navegando actualmente en:
+${parts.join("\n")}
+
+### REGLA CRÍTICA — Resolución de "el proyecto"
+
+Cuando el usuario mencione "el proyecto", "este proyecto", "mi proyecto", "the project", "this project", "dónde estoy", "where am I" o cualquier referencia al proyecto actual, **SIEMPRE** se refiere al proyecto de Azure DevOps indicado arriba (${adoContext.projectName || "desconocido"}).
+
+**Comportamiento obligatorio cuando el usuario pregunte sobre el proyecto:**
+1. **SIEMPRE** usa las herramientas MCP de Azure DevOps para obtener información real y actualizada del proyecto "${adoContext.projectName}" ANTES de responder.
+2. **NUNCA** respondas solo con el nombre del proyecto. Consulta datos reales: repositorios, pipelines, work items, equipos, etc.
+3. **Usa el nombre del proyecto como filtro** en todas las llamadas a herramientas MCP. Por ejemplo, al listar repos, filtra por el proyecto "${adoContext.projectName}".
+4. Si el usuario pide un resumen del proyecto, obtén al menos: repositorios, pipelines recientes y work items activos.
+5. Cualquier operación de Azure DevOps (crear repo, pipeline, work item, etc.) debe hacerse **dentro del proyecto actual** "${adoContext.projectName}" a menos que el usuario indique explícitamente otro proyecto.
+
+**Triggers:** "el proyecto", "este proyecto", "mi proyecto", "the project", "this project", "cuéntame del proyecto", "tell me about this project", "qué hay en el proyecto", "resumen del proyecto", "estado del proyecto", "project status", "project overview".`;
     }
 
     return `Eres un asistente experto en Azure DevOps integrado con GitHub Copilot. 
