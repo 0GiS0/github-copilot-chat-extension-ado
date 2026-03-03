@@ -359,9 +359,20 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
 
     const user = SDK.getUser();
     const defaultLang = LANGUAGES[0];
+
+    // Request high-resolution avatar from Azure DevOps
+    let userImageUrl = user.imageUrl || "";
+    if (userImageUrl) {
+      // Azure DevOps API supports size parameter: small, medium, large
+      // Replace or add size=large parameter for better resolution
+      const url = new URL(userImageUrl);
+      url.searchParams.set('size', 'large');
+      userImageUrl = url.toString();
+    }
+
     this.setState({
       userName: user.displayName,
-      userImageUrl: user.imageUrl || "",
+      userImageUrl,
       messages: [
         {
           id: "welcome",
