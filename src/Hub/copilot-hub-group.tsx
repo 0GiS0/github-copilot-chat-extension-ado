@@ -4,7 +4,7 @@ import * as React from "react";
 import * as ReactDOM from "react-dom";
 import * as SDK from "azure-devops-extension-sdk";
 
-import { copilotService, CopilotModel } from "../services/copilot-service";
+import { copilotService, CopilotModel, AdoContext } from "../services/copilot-service";
 
 import { Header, TitleSize } from "azure-devops-ui/Header";
 import { Page } from "azure-devops-ui/Page";
@@ -144,6 +144,30 @@ const PROMPT_EXAMPLES: IPromptExample[] = [
       zh: "我想在 Azure DevOps 中启动一个新项目",
       ja: "Azure DevOps で新しいプロジェクトを始めたい",
       it: "Voglio iniziare un nuovo progetto in Azure DevOps",
+    },
+  },
+  {
+    id: "about-project",
+    icon: "📖",
+    titles: {
+      es: "Sobre este proyecto",
+      en: "About this project",
+      fr: "À propos de ce projet",
+      de: "Über dieses Projekt",
+      pt: "Sobre este projeto",
+      zh: "关于这个项目",
+      ja: "このプロジェクトについて",
+      it: "Su questo progetto",
+    },
+    prompts: {
+      es: "Cuéntame un poco sobre este proyecto",
+      en: "Tell me about this project",
+      fr: "Parle-moi de ce projet",
+      de: "Erzähl mir etwas über dieses Projekt",
+      pt: "Me conte um pouco sobre este projeto",
+      zh: "告诉我关于这个项目的信息",
+      ja: "このプロジェクトについて教えてください",
+      it: "Raccontami di questo progetto",
     },
   },
   {
@@ -390,6 +414,23 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
       console.log("[CopilotChatHub] ADO access token obtained");
     } catch (error) {
       console.warn("[CopilotChatHub] Failed to get ADO access token:", error);
+    }
+
+    // Capture Azure DevOps navigation context (org, project, team)
+    try {
+      const host = SDK.getHost();
+      const webContext = SDK.getWebContext();
+      const adoContext: AdoContext = {
+        orgName: host.name,
+        projectName: webContext?.project?.name || null,
+        projectId: webContext?.project?.id || null,
+        teamName: webContext?.team?.name || null,
+        teamId: webContext?.team?.id || null,
+      };
+      copilotService.setAdoContext(adoContext);
+      console.log("[CopilotChatHub] ADO context captured:", adoContext);
+    } catch (error) {
+      console.warn("[CopilotChatHub] Failed to capture ADO context:", error);
     }
 
     // Close model dropdown on outside click
