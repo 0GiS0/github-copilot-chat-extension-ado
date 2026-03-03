@@ -43,12 +43,21 @@ export interface CopilotModel {
     premiumRequests: number;
 }
 
+export interface AdoContext {
+    orgName: string;
+    projectName: string | null;
+    projectId: string | null;
+    teamName: string | null;
+    teamId: string | null;
+}
+
 class CopilotService {
     private sessionId: string | null = null;
     private isInitialized = false;
     private language = "es"; // Default language
     private githubToken: string | null = null;
     private adoToken: string | null = null;
+    private adoContext: AdoContext | null = null;
 
     constructor() {
         // Try to restore token from sessionStorage
@@ -225,6 +234,14 @@ class CopilotService {
     }
 
     /**
+     * Set the Azure DevOps navigation context (org, project, team)
+     */
+    setAdoContext(context: AdoContext): void {
+        this.adoContext = context;
+        console.log(`[CopilotService] ADO context set: org=${context.orgName}, project=${context.projectName}, team=${context.teamName}`);
+    }
+
+    /**
      * Get auth headers including the user's GitHub token and ADO token
      */
     private getAuthHeaders(): Record<string, string> {
@@ -313,6 +330,7 @@ class CopilotService {
                     sessionId: this.sessionId,
                     language: this.language,
                     model: model,
+                    adoContext: this.adoContext,
                 }),
             });
 
@@ -424,6 +442,7 @@ class CopilotService {
                 sessionId: this.sessionId,
                 language: this.language,
                 model: model,
+                adoContext: this.adoContext,
             }),
         });
 

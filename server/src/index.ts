@@ -331,8 +331,31 @@ const LANGUAGE_PROMPTS: { [key: string]: string } = {
     it: "Rispondi sempre in italiano in modo chiaro e conciso.",
 };
 
-function getSystemMessage(language: string): string {
+interface AdoContext {
+    orgName: string;
+    projectName: string | null;
+    projectId: string | null;
+    teamName: string | null;
+    teamId: string | null;
+}
+
+function getSystemMessage(language: string, adoContext?: AdoContext): string {
     const langPrompt = LANGUAGE_PROMPTS[language] || LANGUAGE_PROMPTS["en"];
+
+    // Build context section if available
+    let contextSection = "";
+    if (adoContext) {
+        const parts: string[] = [];
+        parts.push(`- **Organización:** ${adoContext.orgName}`);
+        if (adoContext.projectName) {
+            parts.push(`- **Proyecto actual:** ${adoContext.projectName} (ID: ${adoContext.projectId})`);
+        }
+        if (adoContext.teamName) {
+            parts.push(`- **Equipo actual:** ${adoContext.teamName}`);
+        }
+        contextSection = `\n\n## Contexto de navegación del usuario\n\nEl usuario está navegando actualmente en:\n${parts.join("\n")}\n\nCuando el usuario pregunte sobre "este proyecto", "el proyecto actual", "dónde estoy" o similares, usa esta información para dar respuestas contextualizadas. Puedes usar las herramientas de Azure DevOps para obtener más detalles del proyecto si es necesario.`;
+    }
+
     return `Eres un asistente experto en Azure DevOps integrado con GitHub Copilot. 
 Ayudas a los usuarios con:
 - Configuración y gestión de proyectos en Azure DevOps
@@ -340,7 +363,7 @@ Ayudas a los usuarios con:
 - Gestión de work items, sprints y backlogs
 - Mejores prácticas para Azure Repos y code reviews
 - Seguridad y permisos en Azure DevOps
-- Automatización y extensiones
+- Automatización y extensiones${contextSection}
 
 ## REGLA CRÍTICA — Creación de proyectos y Quickstarts
 
@@ -419,7 +442,7 @@ app.post("/chat", async (req: Request, res: Response) => {
         return;
     }
 
-    const { message, language = "es", model: requestedModel } = req.body;
+    const { message, language = "es", model: requestedModel, adoContext } = req.body;
     const adoToken = req.headers["x-ado-token"] as string | undefined;
     const startTime = Date.now();
 
@@ -434,6 +457,9 @@ app.post("/chat", async (req: Request, res: Response) => {
     const model = requestedModel || "gpt-4.1";
 
     log.question("pending", message);
+    if (adoContext?.projectName) {
+        log.info(`[chat] ADO context: org=${adoContext.orgName}, project=${adoContext.projectName}`);
+    }
 
     // Set up SSE headers
     res.setHeader("Content-Type", "text/event-stream");
@@ -468,7 +494,7 @@ app.post("/chat", async (req: Request, res: Response) => {
                     model,
                     streaming: true,
                     onPermissionRequest: _approveAll,
-                    systemMessage: { content: getSystemMessage(language) },
+                    systemMessage: { content: getSystemMessage(language, adoContext) },
                     mcpServers: mcpConfig,
                     customAgents: [quickstartsExpertAgent],
                     tools: adoTools,
@@ -486,7 +512,7 @@ app.post("/chat", async (req: Request, res: Response) => {
                     model,
                     streaming: true,
                     onPermissionRequest: _approveAll,
-                    systemMessage: { content: getSystemMessage(language) },
+                    systemMessage: { content: getSystemMessage(language, adoContext) },
                     mcpServers: mcpConfig,
                     customAgents: [quickstartsExpertAgent],
                     tools: adoTools,
@@ -502,7 +528,7 @@ app.post("/chat", async (req: Request, res: Response) => {
                 model,
                 streaming: true,
                 onPermissionRequest: _approveAll,
-                systemMessage: { content: getSystemMessage(language) },
+                systemMessage: { content: getSystemMessage(language, adoContext) },
                 mcpServers: mcpConfig,
                 customAgents: [quickstartsExpertAgent],
                 tools: adoTools,
@@ -649,7 +675,7 @@ app.post("/chat/sync", async (req: Request, res: Response) => {
         return;
     }
 
-    const { message, sessionId = "default", language = "es", model: requestedModel } = req.body;
+    const { message, sessionId = "default", language = "es", model: requestedModel, adoContext } = req.body;
     const startTime = Date.now();
 
     log.request("POST", "/chat/sync");
@@ -687,7 +713,7 @@ app.post("/chat/sync", async (req: Request, res: Response) => {
                 model,
                 streaming: true,
                 onPermissionRequest: _approveAll,
-                systemMessage: { content: getSystemMessage(language) },
+                systemMessage: { content: getSystemMessage(language, adoContext) },
                 mcpServers: mcpConfig,
                 customAgents: [quickstartsExpertAgent],
                 tools: adoTools,
@@ -700,7 +726,7 @@ app.post("/chat/sync", async (req: Request, res: Response) => {
                 model,
                 streaming: true,
                 onPermissionRequest: _approveAll,
-                systemMessage: { content: getSystemMessage(language) },
+                systemMessage: { content: getSystemMessage(language, adoContext) },
                 mcpServers: mcpConfig,
                 customAgents: [quickstartsExpertAgent],
                 tools: adoTools,
