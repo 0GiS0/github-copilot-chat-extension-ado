@@ -6,8 +6,9 @@
  * well-defined actions instead of free-form MCP calls.
  */
 import { exec } from "child_process";
+import { config } from "../config.js";
 
-const ADO_ORG = "https://dev.azure.com/returngisorg";
+const ADO_ORG = config.adoOrgUrl;
 
 // Simple logger for tool execution
 const toolLog = {
@@ -243,7 +244,7 @@ export async function createAdoProjectTools(adoToken: string) {
     // ── 1. Create an Azure DevOps project ───────────────────────
     const createProject = defineTool("create_ado_project", {
         description:
-            "Create a new Azure DevOps project in the organization (returngisorg). " +
+            `Create a new Azure DevOps project in the organization (${config.adoOrg}). ` +
             "Use this when the user wants to start a new project. " +
             "Returns the project details including its ID and URL.",
         parameters: {
@@ -396,7 +397,8 @@ export async function createAdoProjectTools(adoToken: string) {
                     type: "string",
                     description:
                         "Git clone URL of the Quickstart template repo to import from " +
-                        "(e.g. 'https://returngisorg@dev.azure.com/returngisorg/Quickstarts/_git/react-quickstart')",
+                        `(e.g. 'https://${config.adoOrg}@dev.azure.com/${config.adoOrg}/Quickstarts/_git/react-quickstart')`,
+
                 },
                 repository: {
                     type: "string",
