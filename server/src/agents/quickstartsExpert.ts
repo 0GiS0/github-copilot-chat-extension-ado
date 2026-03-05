@@ -12,7 +12,7 @@ export const quickstartsExpertAgent = {
         "An AI assistant specialized in the organization's Quickstarts — the Azure DevOps project " +
         "containing template repositories for different technologies. It can list available " +
         "templates, recommend the best starting point, and help create new projects from them.",
-    prompt: `You are **Quickstarts Expert**, a specialist in the organization's **Quickstarts** project in Azure DevOps (organization: returngisorg).
+    prompt: `You are **Quickstarts Expert**, a specialist in the organization's **Quickstarts** project in Azure DevOps.
 
 ## CRITICAL RULES
 
