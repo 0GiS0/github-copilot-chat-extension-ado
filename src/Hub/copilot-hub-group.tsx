@@ -361,7 +361,7 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
       streamingMessageId: null,
       isConnected: false,
       connectionError: null,
-      selectedLanguage: LANGUAGES[0], // Default to Spanish
+      selectedLanguage: LANGUAGES[1], // Default to English
       isLanguageSelectorOpen: false,
       // GitHub Auth
       isAuthenticated: copilotService.isAuthenticated(),
@@ -384,7 +384,7 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
     await SDK.ready();
 
     const user = SDK.getUser();
-    const defaultLang = LANGUAGES[0];
+    const defaultLang = LANGUAGES[1];
 
     // Request high-resolution avatar from Azure DevOps
     let userImageUrl = user.imageUrl || "";
@@ -481,10 +481,10 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
       console.log("[CopilotChatHub] Connected to proxy server");
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : "Error desconocido";
+        error instanceof Error ? error.message : "Unknown error";
       this.setState({
         isConnected: false,
-        connectionError: `No se pudo conectar con el servidor proxy: ${errorMessage}. Asegúrate de que esté ejecutándose con: cd server && npm run dev`,
+        connectionError: `Could not connect to the proxy server: ${errorMessage}. Make sure it is running with: cd server && npm run dev`,
       });
       console.error("[CopilotChatHub] Failed to connect:", error);
     }
@@ -551,7 +551,7 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
               }
               this.setState({
                 isAuthenticating: false,
-                authError: "El código ha expirado. Intenta de nuevo.",
+                authError: "The code has expired. Please try again.",
                 authUserCode: null,
               });
               break;
@@ -563,7 +563,7 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
               }
               this.setState({
                 isAuthenticating: false,
-                authError: result.error || "Error de autenticación",
+                authError: result.error || "Authentication error",
                 authUserCode: null,
               });
               break;
@@ -588,7 +588,7 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
       this.pollInterval = setInterval(pollFn, interval);
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : "Error desconocido";
+        error instanceof Error ? error.message : "Unknown error";
       this.setState({
         isAuthenticating: false,
         authError: errorMessage,
@@ -686,7 +686,7 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
             id: `error-${Date.now()}`,
             role: "assistant",
             content:
-              "⚠️ Necesitas iniciar sesión con GitHub primero. Haz clic en el botón 'Iniciar sesión con GitHub' arriba.",
+              "⚠️ You need to sign in with GitHub first. Click the central 'Sign in with GitHub' button to continue.",
             timestamp: new Date(),
           },
         ],
@@ -703,7 +703,7 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
             id: `error-${Date.now()}`,
             role: "assistant",
             content:
-              "⚠️ No hay conexión con el servidor proxy. Asegúrate de ejecutar: `cd server && npm run dev`",
+              "⚠️ There is no connection to the proxy server. Make sure you run: `cd server && npm run dev`",
             timestamp: new Date(),
           },
         ],
@@ -790,11 +790,11 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
       );
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : "Error desconocido";
+        error instanceof Error ? error.message : "Unknown error";
       this.setState((prevState) => ({
         messages: prevState.messages.map((msg) =>
           msg.id === assistantMessageId
-            ? { ...msg, content: `❌ Error al enviar mensaje: ${errorMessage}` }
+            ? { ...msg, content: `❌ Error sending message: ${errorMessage}` }
             : msg,
         ),
         isLoading: false,
@@ -811,21 +811,21 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
     // Well-known MCP tool names → friendly labels
     const TOOL_LABELS: Record<string, string> = {
       // ADO MCP tools
-      "list_repos": "📋 Listando repositorios...",
-      "get_repo": "📂 Leyendo repositorio...",
-      "list_projects": "🏢 Listando proyectos...",
-      "create_project": "🏗️ Creando proyecto...",
-      "create_repo": "📦 Creando repositorio...",
-      "search_code": "🔍 Buscando código...",
-      "get_work_items": "📝 Consultando work items...",
-      "create_work_item": "📝 Creando work item...",
-      "get_pipelines": "🔄 Consultando pipelines...",
-      "create_pipeline": "🔄 Creando pipeline...",
+      "list_repos": "📋 Listing repositories...",
+      "get_repo": "📂 Reading repository...",
+      "list_projects": "🏢 Listing projects...",
+      "create_project": "🏗️ Creating project...",
+      "create_repo": "📦 Creating repository...",
+      "search_code": "🔍 Searching code...",
+      "get_work_items": "📝 Fetching work items...",
+      "create_work_item": "📝 Creating work item...",
+      "get_pipelines": "🔄 Fetching pipelines...",
+      "create_pipeline": "🔄 Creating pipeline...",
       // Custom ADO project tools
-      "create_ado_project": "🏗️ Creando proyecto en Azure DevOps...",
-      "create_ado_repo": "📦 Creando repositorio...",
-      "import_quickstart_repo": "📥 Importando plantilla Quickstart...",
-      "setup_ado_pipeline": "⚙️ Configurando pipeline CI/CD...",
+      "create_ado_project": "🏗️ Creating Azure DevOps project...",
+      "create_ado_repo": "📦 Creating repository...",
+      "import_quickstart_repo": "📥 Importing Quickstart template...",
+      "setup_ado_pipeline": "⚙️ Configuring CI/CD pipeline...",
     };
 
     switch (action) {
@@ -838,7 +838,7 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
       case "tool_end":
         return null; // Clear on completion — let next tool or delta take over
       case "agent_start":
-        return `🤖 ${detail} trabajando...`;
+        return `🤖 ${detail} working...`;
       case "agent_end":
         return null;
       default:
@@ -945,81 +945,20 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
         />
 
         <div className="page-content flex-grow">
-          {/* Top bar: Language Selector + Auth + Model Selector */}
-          <div className="top-bar-container">
-            {/* Language Selector */}
-            <div className="language-selector-container">
-              <button
-                className="language-selector-button"
-                onClick={this.toggleLanguageSelector}
-                aria-label="Select language"
-              >
-                <span className="language-flag">{selectedLanguage.flag}</span>
-                <span className="language-name">{selectedLanguage.name}</span>
-                <span className="language-arrow">
-                  {isLanguageSelectorOpen ? "▲" : "▼"}
-                </span>
-              </button>
-
-              {isLanguageSelectorOpen && (
-                <div className="language-dropdown">
-                  {LANGUAGES.map((lang) => (
-                    <button
-                      key={lang.code}
-                      className={`language-option ${lang.code === selectedLanguage.code ? "selected" : ""}`}
-                      onClick={() => this.handleLanguageChange(lang)}
-                    >
-                      <span className="language-flag">{lang.flag}</span>
-                      <span className="language-name">{lang.name}</span>
-                      {lang.code === selectedLanguage.code && (
-                        <span className="language-check">✓</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* GitHub Auth */}
-            <div className="github-auth-container">
-              {isAuthenticated ? (
-                <button
-                  className="github-auth-button authenticated"
-                  onClick={this.handleGitHubLogout}
-                  title="Cerrar sesión de GitHub"
-                >
-                  <span className="github-icon">🔓</span>
-                  <span className="github-auth-text">GitHub ✓</span>
-                </button>
-              ) : (
-                <button
-                  className="github-auth-button"
-                  onClick={this.handleGitHubLogin}
-                  disabled={isAuthenticating}
-                >
-                  <span className="github-icon">🔐</span>
-                  <span className="github-auth-text">
-                    {isAuthenticating ? "Autenticando..." : "Iniciar sesión con GitHub"}
-                  </span>
-                </button>
-              )}
-            </div>
-          </div>
-
           {/* Device Flow Auth Dialog */}
           {isAuthenticating && authUserCode && (
             <div className="auth-dialog">
               <div className="auth-dialog-content">
-                <h3>🔐 Autenticación con GitHub</h3>
-                <p>Introduce este código en GitHub:</p>
+                <h3>🔐 GitHub Authentication</h3>
+                <p>Enter this code on GitHub:</p>
                 <div className="auth-code">{authUserCode}</div>
                 <p>
-                  Se ha abierto una ventana con{" "}
+                  A window has been opened at{" "}
                   <a href={authVerificationUri || "#"} target="_blank" rel="noopener noreferrer">
                     {authVerificationUri}
                   </a>
                 </p>
-                <p className="auth-waiting">⏳ Esperando autenticación...</p>
+                <p className="auth-waiting">⏳ Waiting for authentication...</p>
                 <button
                   className="auth-cancel-button"
                   onClick={() => {
@@ -1034,7 +973,7 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
                     });
                   }}
                 >
-                  Cancelar
+                  Cancel
                 </button>
               </div>
             </div>
@@ -1054,13 +993,12 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
               <div className="auth-required-content">
                 <img src={copilotIcon} alt="Copilot" className="auth-copilot-icon" />
                 <h2>GitHub Copilot Chat</h2>
-                <p>Para usar el chat, primero necesitas iniciar sesión con tu cuenta de GitHub.</p>
-                <p className="auth-subtitle">Cada usuario interactúa con Copilot usando su propia cuenta.</p>
+                <p>Sign in with your GitHub account to start chatting.</p>
                 <button
                   className="github-login-button-large"
                   onClick={this.handleGitHubLogin}
                 >
-                  <span>🔐</span> Iniciar sesión con GitHub
+                  <span>🔐</span> Sign in with GitHub
                 </button>
               </div>
             </div>
@@ -1132,7 +1070,7 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
                     onClick={this.handleSendMessage}
                     disabled={isLoading || !inputValue.trim()}
                   iconProps={{ iconName: "Send" }}
-                  ariaLabel="Enviar"
+                  ariaLabel="Send"
                 />
                 </div>
                 {isAuthenticated && (models.length > 0 || modelsLoading) && (
@@ -1185,8 +1123,41 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
 
             <div className="prompts-sidebar">
               <div className="prompts-header">
-                <span className="prompts-icon">💡</span>
-                <h3>{selectedLanguage.promptsTitle.replace("💡 ", "")}</h3>
+                <div className="prompts-header-title">
+                  <span className="prompts-icon">💡</span>
+                  <h3>{selectedLanguage.promptsTitle.replace("💡 ", "")}</h3>
+                </div>
+                <div className="language-selector-container prompts-language-selector">
+                  <button
+                    className="language-selector-button"
+                    onClick={this.toggleLanguageSelector}
+                    aria-label="Select language"
+                  >
+                    <span className="language-flag">{selectedLanguage.flag}</span>
+                    <span className="language-name">{selectedLanguage.name}</span>
+                    <span className="language-arrow">
+                      {isLanguageSelectorOpen ? "▲" : "▼"}
+                    </span>
+                  </button>
+
+                  {isLanguageSelectorOpen && (
+                    <div className="language-dropdown">
+                      {LANGUAGES.map((lang) => (
+                        <button
+                          key={lang.code}
+                          className={`language-option ${lang.code === selectedLanguage.code ? "selected" : ""}`}
+                          onClick={() => this.handleLanguageChange(lang)}
+                        >
+                          <span className="language-flag">{lang.flag}</span>
+                          <span className="language-name">{lang.name}</span>
+                          {lang.code === selectedLanguage.code && (
+                            <span className="language-check">✓</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="prompts-list">
                 {PROMPT_EXAMPLES.map((example) => (

@@ -7,7 +7,7 @@
                 "ms.vss-web.project-hub-groups-collection"
             ],
             "properties": {
-                "name": "Copilot",
+                "name": "GitHub Copilot",
                 "icon": {
                     "light": "static/copilot-icon.png",
                     "dark": "static/copilot-icon.png"

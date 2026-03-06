@@ -277,7 +277,7 @@ class CopilotService {
         } catch (error) {
             console.error("[CopilotService] Failed to connect to proxy:", error);
             throw new Error(
-                `No se pudo conectar con el servidor proxy. Asegúrate de que esté ejecutándose: cd server && npm run dev`
+                `Could not connect to the proxy server. Make sure it is running: cd server && npm run dev`
             );
         }
     }

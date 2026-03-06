@@ -371,10 +371,18 @@
 
 .prompts-header {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   padding: 20px;
   border-bottom: 1px solid var(--palette-neutral-10, #eaeaea);
+
+  .prompts-header-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
 
   .prompts-icon {
     font-size: 24px;
@@ -492,6 +500,11 @@
   justify-content: flex-end;
   margin-bottom: 12px;
   z-index: 100;
+}
+
+.prompts-language-selector {
+  margin-bottom: 0;
+  flex-shrink: 0;
 }
 
 .language-selector-button {
@@ -613,61 +626,6 @@
 // 🔐 GitHub Auth Styles
 // ═══════════════════════════════════════════════════════════════════════════════
 
-.top-bar-container {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-
-.github-auth-container {
-  margin-left: auto;
-}
-
-.github-auth-button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 16px;
-  border: 1px solid #d0d7de;
-  border-radius: 8px;
-  background: #ffffff;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-  color: #24292f;
-  transition: all 0.2s;
-
-  &:hover {
-    background: #f6f8fa;
-    border-color: #1b1f2326;
-  }
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
-  &.authenticated {
-    border-color: #2da44e;
-    color: #1a7f37;
-    background: #dafbe1;
-
-    &:hover {
-      background: #aceebb;
-    }
-  }
-
-  .github-icon {
-    font-size: 16px;
-  }
-
-  .github-auth-text {
-    white-space: nowrap;
-  }
-}
-
 .auth-dialog {
   position: fixed;
   top: 0;
@@ -787,9 +745,12 @@
   padding: 40px;
 
   .auth-copilot-icon {
-    width: 64px;
-    height: 64px;
-    margin-bottom: 20px;
+    width: 92px;
+    height: 92px;
+    margin-bottom: 24px;
+    animation: authIconFloat 3.8s ease-in-out infinite;
+    transform-origin: center;
+    filter: drop-shadow(0 10px 20px rgba(36, 41, 47, 0.16));
   }
 
   h2 {
@@ -808,6 +769,18 @@
     font-size: 13px;
     color: #8b949e;
     margin-bottom: 24px;
+  }
+}
+
+@keyframes authIconFloat {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-10px) scale(1.03);
+  }
+  100% {
+    transform: translateY(0) scale(1);
   }
 }
 
