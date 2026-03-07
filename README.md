@@ -2,15 +2,15 @@
 
 <div align="center">
 
-[![YouTube Channel Subscribers](https://img.shields.io/youtube/channel/subscribers/UC140iBrEZbOtvxWsJ-Tb0lQ?style=for-the-badge&logo=youtube&logoColor=white&color=red)](https://www.youtube.com/c/GiselaTorres?sub_confirmation=1) [![GitHub followers](https://img.shields.io/github/followers/0GiS0?style=for-the-badge&logo=github&logoColor=white)](https://github.com/0GiS0) [![LinkedIn Follow](https://img.shields.io/badge/LinkedIn-Sígueme-blue?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/giselatorresbuitrago/) [![X Follow](https://img.shields.io/badge/X-Sígueme-black?style=for-the-badge&logo=x&logoColor=white)](https://twitter.com/0GiS0)
+[![YouTube Channel Subscribers](https://img.shields.io/youtube/channel/subscribers/UC140iBrEZbOtvxWsJ-Tb0lQ?style=for-the-badge&logo=youtube&logoColor=white&color=red)](https://www.youtube.com/c/GiselaTorres?sub_confirmation=1) [![GitHub followers](https://img.shields.io/github/followers/0GiS0?style=for-the-badge&logo=github&logoColor=white)](https://github.com/0GiS0) [![LinkedIn Follow](https://img.shields.io/badge/LinkedIn-Follow-blue?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/giselatorresbuitrago/) [![X Follow](https://img.shields.io/badge/X-Follow-black?style=for-the-badge&logo=x&logoColor=white)](https://twitter.com/0GiS0)
 
 </div>
 
 ---
 
-🌍 *[Read in English](README.en.md)*
+🌍 *[Leer en español](README.es.md)*
 
-¡Hola developer 👋🏻! Este proyecto es una extensión de Azure DevOps que integra GitHub Copilot Chat directamente en tu flujo de trabajo de desarrollo.
+Hey developer 👋🏻! This project is an Azure DevOps extension that integrates GitHub Copilot Chat directly into your development workflow.
 
 <div align="center">
   <img src="static/copilot-icon.png" alt="GitHub Copilot Chat Extension" width="200" />
@@ -18,79 +18,85 @@
 
 ---
 
-## ✨ Características
+## 📌 Project Summary
 
-- 💬 Interfaz de chat integrada en Azure DevOps
-- 🤖 Integración con GitHub Copilot para asistencia de código
-- 🎨 UI nativa que se adapta al tema de Azure DevOps
-- 🔐 Autenticación OAuth con GitHub Device Flow
-- 🔄 Hot Reload para desarrollo local
+This repository contains an Azure DevOps extension that brings GitHub Copilot Chat directly into the Azure DevOps experience. Its goal is to provide AI-powered assistance inside the tools teams already use every day, including repositories, pipelines, work items, and broader Azure DevOps workflows, without forcing users to leave the platform.
 
-## 📋 Requisitos Previos
+The project is especially focused on supporting our valued Azure DevOps customers who are not yet ready to migrate to GitHub, but still expect GitHub Copilot to be part of the platform they work in. In that sense, the extension acts as a bridge between Azure DevOps and GitHub Copilot, making it possible to access Copilot capabilities from within ADO while staying in a familiar environment.
+
+## ✨ Features
+
+- 💬 Chat interface integrated into Azure DevOps
+- 🤖 GitHub Copilot integration for code assistance
+- 🎨 Native UI that adapts to Azure DevOps theme
+- 🔐 OAuth authentication with GitHub Device Flow
+- 🔄 Hot Reload for local development
+
+## 📋 Prerequisites
 
 - Azure DevOps organization
 - Node.js 18+
 - [tfx-cli](https://github.com/microsoft/tfs-cli)
-- Cuenta de GitHub con acceso a Copilot
+- GitHub account with Copilot access
 
-## 🚀 Instalación
+## 🚀 Installation
 
 ```bash
-# Clonar e instalar
+# Clone and install
 git clone https://github.com/0GiS0/github-copilot-chat-extension-ado.git
 cd github-copilot-chat-extension-ado
 npm install && npm run server:install
 
-# Configurar variables de entorno en server/.env
-GITHUB_CLIENT_ID=tu_client_id
-GITHUB_CLIENT_SECRET=tu_client_secret
-ADO_ORG=tu_organizacion_ado
+# Configure environment variables in server/.env
+GITHUB_CLIENT_ID=your_client_id
+GITHUB_CLIENT_SECRET=your_client_secret
+ADO_ORG=your_ado_organization
 ```
 
-## 💻 Uso
+## 💻 Usage
 
 ```bash
-# Desarrollo (API + extensión con hot reload)
+# Development (API + extension with hot reload)
 npm run dev
 
-# Producción (genera .vsix)
+# Production (generates .vsix)
 npm run build
 ```
 
-## 📦 Scripts Principales
+## 📦 Main Scripts
 
-| Script | Descripción |
+| Script | Description |
 | ------ | ----------- |
-| `npm run dev` | API + extensión simultáneamente |
-| `npm run build` | Compila para producción |
-| `npm run start:dev` | Solo webpack-dev-server |
-| `npm run server:dev` | Solo API |
+| `npm run dev` | API + extension simultaneously |
+| `npm run build` | Build for production |
+| `npm run start:dev` | Only webpack-dev-server |
+| `npm run server:dev` | Only API |
 
-## 🛠️ Desarrollo con Hot Reload
+## 🛠️ Development with Hot Reload
 
-1. Configura `baseUri: "https://localhost:3000"` en `azure-devops-extension-dev.json`
-2. Crea un PAT en Azure DevOps con scope **Marketplace → Manage**
-3. Publica la extensión de desarrollo:
+1. Set `baseUri: "https://localhost:3000"` in `azure-devops-extension-dev.json`
+2. Create a PAT in Azure DevOps with scope **Marketplace → Manage**
+3. Publish the development extension:
    ```bash
    source .env && npm run publish-extension:dev -- --token $AZURE_DEVOPS_PAT
    ```
-4. Ejecuta `npm run dev` y acepta el certificado SSL en `https://localhost:3000`
+4. Run `npm run dev` and accept the SSL certificate at `https://localhost:3000`
 
-## 📖 Documentación
+## 📖 Documentation
 
-- [Extensiones de Azure DevOps](https://docs.microsoft.com/en-us/azure/devops/extend/)
-- [Guía de publicación](https://docs.microsoft.com/en-us/azure/devops/extend/publish/overview)
+- [Azure DevOps Extensions](https://docs.microsoft.com/en-us/azure/devops/extend/)
+- [Publishing Guide](https://docs.microsoft.com/en-us/azure/devops/extend/publish/overview)
 
-## 📄 Licencia
+## 📄 License
 
-MIT - Ver [LICENSE](LICENSE)
+MIT - See [LICENSE](LICENSE)
 
 ---
 
-## 🌐 Sígueme en Mis Redes Sociales
+## 🌐 Follow Me on Social Media
 
 <div align="center">
 
-[![YouTube Channel Subscribers](https://img.shields.io/youtube/channel/subscribers/UC140iBrEZbOtvxWsJ-Tb0lQ?style=for-the-badge&logo=youtube&logoColor=white&color=red)](https://www.youtube.com/c/GiselaTorres?sub_confirmation=1) [![GitHub followers](https://img.shields.io/github/followers/0GiS0?style=for-the-badge&logo=github&logoColor=white)](https://github.com/0GiS0) [![LinkedIn Follow](https://img.shields.io/badge/LinkedIn-Sígueme-blue?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/giselatorresbuitrago/) [![X Follow](https://img.shields.io/badge/X-Sígueme-black?style=for-the-badge&logo=x&logoColor=white)](https://twitter.com/0GiS0)
+[![YouTube Channel Subscribers](https://img.shields.io/youtube/channel/subscribers/UC140iBrEZbOtvxWsJ-Tb0lQ?style=for-the-badge&logo=youtube&logoColor=white&color=red)](https://www.youtube.com/c/GiselaTorres?sub_confirmation=1) [![GitHub followers](https://img.shields.io/github/followers/0GiS0?style=for-the-badge&logo=github&logoColor=white)](https://github.com/0GiS0) [![LinkedIn Follow](https://img.shields.io/badge/LinkedIn-Follow-blue?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/giselatorresbuitrago/) [![X Follow](https://img.shields.io/badge/X-Follow-black?style=for-the-badge&logo=x&logoColor=white)](https://twitter.com/0GiS0)
 
 </div>
