@@ -22,7 +22,6 @@ Hey developer 👋🏻! This project is an Azure DevOps extension that integrate
 
 This repository contains an Azure DevOps extension that brings GitHub Copilot Chat directly into the Azure DevOps experience. Its goal is to provide AI-powered assistance inside the tools teams already use every day, including repositories, pipelines, work items, and broader Azure DevOps workflows, without forcing users to leave the platform.
 
-The project is especially focused on supporting our valued Azure DevOps customers who are not yet ready to migrate to GitHub, but still expect GitHub Copilot to be part of the platform they work in. In that sense, the extension acts as a bridge between Azure DevOps and GitHub Copilot, making it possible to access Copilot capabilities from within ADO while staying in a familiar environment.
 
 ## ✨ Features
 
