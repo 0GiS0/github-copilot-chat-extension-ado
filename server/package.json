@@ -14,7 +14,7 @@
         "lint": "tsc --noEmit"
     },
     "dependencies": {
-        "@github/copilot-sdk": "^0.1.29",
+        "@github/copilot-sdk": "^0.1.32",
         "chalk": "^5.6.2",
         "cors": "^2.8.5",
         "dotenv": "^17.2.3",
