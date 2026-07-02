@@ -24,3 +24,4 @@ coverage
 # OS files
 .DS_Store
 Thumbs.db
+.impeccable/hook.cache.json

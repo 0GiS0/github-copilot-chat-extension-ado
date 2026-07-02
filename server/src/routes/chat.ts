@@ -58,7 +58,7 @@ chatRouter.post("/", async (req: Request, res: Response) => {
     try {
         const key = tokenKey(githubToken);
         const existing = getSession(key);
-        const mcpConfig = getMcpConfig(adoToken);
+        const mcpConfig = getMcpConfig(adoToken, adoContext?.orgName || undefined);
         const approveAll = await getApproveAll();
 
         const ClientClass = await getCopilotClient();
@@ -263,7 +263,7 @@ chatRouter.post("/sync", async (req: Request, res: Response) => {
     try {
         const key = tokenKey(githubToken);
         const existing = getSession(key);
-        const mcpConfig = getMcpConfig(adoToken);
+        const mcpConfig = getMcpConfig(adoToken, adoContext?.orgName || undefined);
         const approveAll = await getApproveAll();
 
         const ClientClass = await getCopilotClient();
