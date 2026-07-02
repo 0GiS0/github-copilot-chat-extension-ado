@@ -1,0 +1,20 @@
+{
+    "contributions": [
+        {
+            "id": "product-definition-hub",
+            "type": "ms.vss-web.hub",
+            "targets": [
+                "ms.vss-work-web.work-hub-group"
+            ],
+            "properties": {
+                "name": "Product Definition",
+                "uri": "dist/product-definition/product-definition.html",
+                "icon": {
+                    "light": "static/copilot-icon.png",
+                    "dark": "static/copilot-icon.png"
+                },
+                "order": 99
+            }
+        }
+    ]
+}

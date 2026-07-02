@@ -5,7 +5,12 @@
  */
 import { config } from "../config.js";
 
-export function getMcpConfig(adoToken?: string) {
+export function getMcpConfig(adoToken?: string, adoOrgName?: string) {
+    const resolvedOrg = (adoOrgName || config.adoOrg || "").trim();
+    if (!resolvedOrg) {
+        return {};
+    }
+
     return {
         ado: {
             type: "local" as const,
@@ -14,7 +19,7 @@ export function getMcpConfig(adoToken?: string) {
             args: [
                 "-y",
                 "@azure-devops/mcp",
-                config.adoOrg,
+                resolvedOrg,
                 "--authentication",
                 "envvar",
             ],
