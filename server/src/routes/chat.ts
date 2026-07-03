@@ -9,7 +9,7 @@ import { getMcpConfig } from "../services/mcp.js";
 import { getSession, setSession, deleteSession } from "../services/sessions.js";
 import { getSystemMessage, AdoContext } from "../prompts/system.js";
 import { quickstartsExpertAgent, productDefinitionExpert } from "../agents/index.js";
-import { createAdoProjectTools, createWorkItemTools } from "../tools/index.js";
+import { createAdoProjectTools } from "../tools/index.js";
 
 export const chatRouter = Router();
 
@@ -38,7 +38,7 @@ chatRouter.post("/", async (req: Request, res: Response) => {
         return;
     }
 
-    const model = requestedModel || "gpt-4.1";
+    const model = requestedModel || "gpt-5.2";
 
     log.question("pending", message);
     if (adoContext?.projectName) {
@@ -67,10 +67,7 @@ chatRouter.post("/", async (req: Request, res: Response) => {
 
         // Create per-request tools that capture the user's ADO token
         const adoTools = adoToken
-            ? [
-                ...(await createAdoProjectTools(adoToken)),
-                ...(await createWorkItemTools(adoToken)),
-            ]
+            ? await createAdoProjectTools(adoToken)
             : [];
 
         let sessionId: string;
@@ -271,10 +268,7 @@ chatRouter.post("/sync", async (req: Request, res: Response) => {
         await client.start();
 
         const adoTools = adoToken
-            ? [
-                ...(await createAdoProjectTools(adoToken)),
-                ...(await createWorkItemTools(adoToken)),
-            ]
+            ? await createAdoProjectTools(adoToken)
             : [];
 
         const sessionOpts = {

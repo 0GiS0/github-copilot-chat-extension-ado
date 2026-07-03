@@ -19,6 +19,7 @@
     ],
     "scopes": [
         "vso.work",
+        "vso.work_write",
         "vso.code_write",
         "vso.build",
         "vso.release",
