@@ -6,12 +6,27 @@ import * as SDK from "azure-devops-extension-sdk";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import { copilotService, AdoContext } from "../services/copilot-service";
+import { copilotService, AdoContext, CopilotModel } from "../services/copilot-service";
 import { Header, TitleSize } from "azure-devops-ui/Header";
 import { Page } from "azure-devops-ui/Page";
 import { Button } from "azure-devops-ui/Button";
+import copilotIcon from "../../static/copilot-icon.png";
 
 const PROXY_BASE_URL = "http://localhost:3001";
+
+interface ILanguageOption {
+  code: string;
+  name: string;
+  flag: string;
+}
+
+const LANGUAGE_OPTIONS: ILanguageOption[] = [
+  { code: "en", name: "English", flag: "🇬🇧" },
+  { code: "es", name: "Español", flag: "🇪🇸" },
+  { code: "fr", name: "Français", flag: "🇫🇷" },
+  { code: "de", name: "Deutsch", flag: "🇩🇪" },
+  { code: "pt", name: "Português", flag: "🇧🇷" },
+];
 
 interface IChatMessage {
   id: string;
@@ -34,7 +49,11 @@ interface IProductDefinitionState {
   workItemId: string;
   isLoading: boolean;
   language: string;
+  models: CopilotModel[];
+  selectedModel: string;
+  modelsLoading: boolean;
   userName: string;
+  userImageUrl: string;
   adoContext: AdoContext | null;
   isConnected: boolean;
   isAuthenticated: boolean;
@@ -100,7 +119,11 @@ class ProductDefinitionHub extends React.Component<{}, IProductDefinitionState> 
       workItemId: "",
       isLoading: false,
       language: "en",
+      models: [],
+      selectedModel: "gpt-5.2",
+      modelsLoading: false,
       userName: "",
+      userImageUrl: "",
       adoContext: null,
       isConnected: false,
       isAuthenticated: copilotService.isAuthenticated(),
@@ -115,6 +138,12 @@ class ProductDefinitionHub extends React.Component<{}, IProductDefinitionState> 
     const user = SDK.getUser();
     const host = SDK.getHost();
     const webContext = SDK.getWebContext();
+    let userImageUrl = user.imageUrl || "";
+    if (userImageUrl) {
+      const url = new URL(userImageUrl);
+      url.searchParams.set("size", "large");
+      userImageUrl = url.toString();
+    }
 
     this.adoContext = {
       orgName: host.name,
@@ -149,8 +178,13 @@ class ProductDefinitionHub extends React.Component<{}, IProductDefinitionState> 
       isAuthenticated = verification.valid;
     }
 
+    if (isAuthenticated) {
+      await this.loadModels();
+    }
+
     this.setState({
       userName: user.displayName,
+      userImageUrl: userImageUrl,
       adoContext: this.adoContext,
       isConnected: isConnected,
       isAuthenticated: isAuthenticated,
@@ -228,6 +262,31 @@ class ProductDefinitionHub extends React.Component<{}, IProductDefinitionState> 
     this.sessionId = null;
     this.setState({ language: language });
   };
+
+  private handleModelChange = (
+    event: React.ChangeEvent<HTMLSelectElement>,
+  ) => {
+    const modelId = event.target.value;
+    this.sessionId = null;
+    copilotService.resetSession();
+    this.setState({ selectedModel: modelId });
+  };
+
+  private async loadModels() {
+    this.setState({ modelsLoading: true });
+    try {
+      const models = await copilotService.fetchModels();
+      const defaultModel = models.find((model) => model.id === "gpt-5.2");
+      this.setState({
+        models,
+        selectedModel: defaultModel ? defaultModel.id : models.length > 0 ? models[0].id : "gpt-5.2",
+        modelsLoading: false,
+      });
+    } catch (error) {
+      console.error("[ProductDefinitionHub] Failed to load models:", error);
+      this.setState({ modelsLoading: false });
+    }
+  }
 
   private handleInputChange = (
     event: React.ChangeEvent<HTMLTextAreaElement>,
@@ -350,6 +409,7 @@ class ProductDefinitionHub extends React.Component<{}, IProductDefinitionState> 
         message: prompt,
         sessionId: this.sessionId,
         language: this.state.language,
+        model: this.state.selectedModel,
         adoContext: this.adoContext,
         agent: "product-definition",
       }),
@@ -450,7 +510,19 @@ class ProductDefinitionHub extends React.Component<{}, IProductDefinitionState> 
 
   private renderAvatar(role: "user" | "assistant"): JSX.Element {
     if (role === "assistant") {
-      return <div className="pd-message-avatar">🤖</div>;
+      return (
+        <div className="pd-message-avatar assistant">
+          <img src={copilotIcon} alt="GitHub Copilot" />
+        </div>
+      );
+    }
+
+    if (this.state.userImageUrl) {
+      return (
+        <div className="pd-message-avatar user">
+          <img src={this.state.userImageUrl} alt={this.state.userName} />
+        </div>
+      );
     }
 
     const initials = this.state.userName
@@ -462,7 +534,7 @@ class ProductDefinitionHub extends React.Component<{}, IProductDefinitionState> 
       .slice(0, 2)
       .toUpperCase();
 
-    return <div className="pd-message-avatar">{initials || "U"}</div>;
+    return <div className="pd-message-avatar user">{initials || "U"}</div>;
   }
 
   public render(): JSX.Element {
@@ -484,16 +556,39 @@ class ProductDefinitionHub extends React.Component<{}, IProductDefinitionState> 
             <p>Validate stories, generate acceptance criteria, and break work down into deliverable slices.</p>
           </div>
 
-          <label className="pd-language-selector">
-            Response language
-            <select value={this.state.language} onChange={this.handleLanguageChange}>
-              <option value="en">English</option>
-              <option value="es">Español</option>
-              <option value="fr">Français</option>
-              <option value="de">Deutsch</option>
-              <option value="pt">Português</option>
-            </select>
-          </label>
+          <div className="pd-header-controls">
+            <label className="pd-language-selector">
+              Response language
+              <select value={this.state.language} onChange={this.handleLanguageChange}>
+                {LANGUAGE_OPTIONS.map((language) => (
+                  <option key={language.code} value={language.code}>
+                    {language.flag} {language.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="pd-language-selector">
+              Model
+              <select
+                value={this.state.selectedModel}
+                onChange={this.handleModelChange}
+                disabled={this.state.modelsLoading || this.state.isLoading || this.state.models.length === 0}
+              >
+                {this.state.modelsLoading && (
+                  <option value={this.state.selectedModel}>Loading models...</option>
+                )}
+                {!this.state.modelsLoading && this.state.models.length === 0 && (
+                  <option value={this.state.selectedModel}>{this.state.selectedModel}</option>
+                )}
+                {this.state.models.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
         </div>
 
         <div className="pd-quick-actions">
