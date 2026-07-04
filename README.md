@@ -34,7 +34,7 @@ This repository contains an Azure DevOps extension that brings GitHub Copilot Ch
 ## 📋 Prerequisites
 
 - Azure DevOps organization
-- Node.js 18+
+- Node.js 20+
 - [tfx-cli](https://github.com/microsoft/tfs-cli)
 - GitHub account with Copilot access
 
