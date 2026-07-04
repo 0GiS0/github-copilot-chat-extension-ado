@@ -1,6 +1,9 @@
 /**
  * 💬 Chat routes — /chat (streaming) and /chat/sync (non-streaming)
  */
+import { mkdtemp, rm, writeFile } from "fs/promises";
+import os from "os";
+import path from "path";
 import { Router, Request, Response } from "express";
 import { log } from "../logger.js";
 import { getGitHubToken, tokenKey } from "../middleware/auth.js";
@@ -13,6 +16,84 @@ import { createAdoProjectTools } from "../tools/index.js";
 
 export const chatRouter = Router();
 
+interface IncomingAttachment {
+    name?: string;
+    mimeType?: string;
+    dataUrl?: string;
+}
+
+type KnowledgeBaseOption = "sharepoint" | "confluence" | "azure-devops-wiki";
+
+function parseDataUrl(dataUrl: string): { mimeType: string; buffer: Buffer } {
+    const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+    if (!match) {
+        throw new Error("Invalid attachment payload.");
+    }
+
+    return {
+        mimeType: match[1],
+        buffer: Buffer.from(match[2], "base64"),
+    };
+}
+
+async function materializeAttachments(
+    attachments: IncomingAttachment[] | undefined,
+): Promise<{ tempDir: string | null; sdkAttachments: Array<{ type: "file"; path: string; displayName?: string }> }> {
+    if (!attachments || attachments.length === 0) {
+        return { tempDir: null, sdkAttachments: [] };
+    }
+
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), "product-definition-"));
+    const sdkAttachments: Array<{ type: "file"; path: string; displayName?: string }> = [];
+
+    for (let index = 0; index < attachments.length; index += 1) {
+        const attachment = attachments[index];
+        if (!attachment?.dataUrl) {
+            continue;
+        }
+
+        const { mimeType, buffer } = parseDataUrl(attachment.dataUrl);
+        if (!mimeType.startsWith("image/")) {
+            throw new Error("Only image attachments are supported.");
+        }
+
+        const ext = mimeType.split("/")[1] || "png";
+        const safeBaseName = (attachment.name || `image-${index + 1}`)
+            .replace(/[^\w.-]+/g, "-")
+            .replace(/^-+|-+$/g, "");
+        const fileName = safeBaseName.includes(".") ? safeBaseName : `${safeBaseName || `image-${index + 1}`}.${ext}`;
+        const filePath = path.join(tempDir, fileName);
+        await writeFile(filePath, buffer);
+        sdkAttachments.push({
+            type: "file",
+            path: filePath,
+            displayName: attachment.name || fileName,
+        });
+    }
+
+    return { tempDir, sdkAttachments };
+}
+
+function buildPromptWithKnowledgeBase(message: string, knowledgeBase?: KnowledgeBaseOption): string {
+    if (!knowledgeBase) {
+        return message;
+    }
+
+    const knowledgeBaseLabels: Record<KnowledgeBaseOption, string> = {
+        sharepoint: "SharePoint",
+        confluence: "Confluence",
+        "azure-devops-wiki": "Azure DevOps Wiki",
+    };
+
+    const selectedKnowledgeBase = knowledgeBaseLabels[knowledgeBase];
+    return [
+        `Selected customer knowledge base: ${selectedKnowledgeBase}.`,
+        `Use it as the preferred source of product context when relevant. If that knowledge base is not available in the current conversation or tools, say so explicitly and ask for the relevant excerpt, page, or link instead of inventing details.`,
+        "",
+        message,
+    ].join("\n");
+}
+
 // ── POST /chat — SSE streaming chat ────────────────────────────
 chatRouter.post("/", async (req: Request, res: Response) => {
     const githubToken = getGitHubToken(req);
@@ -21,11 +102,13 @@ chatRouter.post("/", async (req: Request, res: Response) => {
         return;
     }
 
-    const { message, language = "es", model: requestedModel, adoContext } = req.body as {
+    const { message, language = "es", model: requestedModel, knowledgeBase, adoContext, attachments } = req.body as {
         message?: string;
         language?: string;
         model?: string;
+        knowledgeBase?: KnowledgeBaseOption;
         adoContext?: AdoContext;
+        attachments?: IncomingAttachment[];
     };
     const adoToken = req.headers["x-ado-token"] as string | undefined;
     const startTime = Date.now();
@@ -54,6 +137,7 @@ chatRouter.post("/", async (req: Request, res: Response) => {
 
     let client: any = null;
     let session: any = null;
+    let tempAttachmentDir: string | null = null;
 
     try {
         const key = tokenKey(githubToken);
@@ -199,7 +283,10 @@ chatRouter.post("/", async (req: Request, res: Response) => {
         req.on("close", onClose);
 
         // Send message and wait for full response (5 min timeout for MCP tool operations)
-        await session.sendAndWait({ prompt: message }, 300_000);
+        const attachmentPayload = await materializeAttachments(attachments);
+        tempAttachmentDir = attachmentPayload.tempDir;
+        const prompt = buildPromptWithKnowledgeBase(message, knowledgeBase);
+        await session.sendAndWait({ prompt, attachments: attachmentPayload.sdkAttachments }, 300_000);
 
         completed = true;
         cleanupSubscriptions();
@@ -212,6 +299,9 @@ chatRouter.post("/", async (req: Request, res: Response) => {
 
         await session.destroy();
         await client.stop();
+        if (tempAttachmentDir) {
+            await rm(tempAttachmentDir, { recursive: true, force: true });
+        }
 
         res.write(`data: ${JSON.stringify({ type: "complete", content: fullContent })}\n\n`);
         res.write("data: [DONE]\n\n");
@@ -225,6 +315,7 @@ chatRouter.post("/", async (req: Request, res: Response) => {
 
         try { if (session) await session.destroy(); } catch { /* ignore */ }
         try { if (client) await client.stop(); } catch { /* ignore */ }
+        try { if (tempAttachmentDir) await rm(tempAttachmentDir, { recursive: true, force: true }); } catch { /* ignore */ }
 
         res.write(`data: ${JSON.stringify({ type: "error", error: errorMessage, resetSession: true })}\n\n`);
         res.end();
@@ -239,11 +330,26 @@ chatRouter.post("/sync", async (req: Request, res: Response) => {
         return;
     }
 
-    const { message, sessionId: _unusedSessionId = "default", language = "es", model: requestedModel, adoContext } = req.body;
+    const {
+        message,
+        sessionId: _unusedSessionId = "default",
+        language = "es",
+        model: requestedModel,
+        knowledgeBase,
+        adoContext,
+        attachments,
+    } = req.body as {
+        message?: string;
+        sessionId?: string;
+        language?: string;
+        model?: string;
+        knowledgeBase?: KnowledgeBaseOption;
+        adoContext?: AdoContext;
+        attachments?: IncomingAttachment[];
+    };
     const startTime = Date.now();
 
     log.request("POST", "/chat/sync");
-    log.question(_unusedSessionId, message);
 
     if (!message) {
         log.warn("Mensaje vacío recibido");
@@ -251,11 +357,14 @@ chatRouter.post("/sync", async (req: Request, res: Response) => {
         return;
     }
 
+    log.question(_unusedSessionId, message);
+
     const model = requestedModel || "gpt-5.2";
     const adoToken = req.headers["x-ado-token"] as string | undefined;
 
     let client: any = null;
     let session: any = null;
+    let tempAttachmentDir: string | null = null;
 
     try {
         const key = tokenKey(githubToken);
@@ -292,7 +401,10 @@ chatRouter.post("/sync", async (req: Request, res: Response) => {
             setSession(key, sessionId);
         }
 
-        const response = await session.sendAndWait({ prompt: message }, 300_000);
+        const attachmentPayload = await materializeAttachments(attachments);
+        tempAttachmentDir = attachmentPayload.tempDir;
+        const prompt = buildPromptWithKnowledgeBase(message, knowledgeBase);
+        const response = await session.sendAndWait({ prompt, attachments: attachmentPayload.sdkAttachments }, 300_000);
         const duration = Date.now() - startTime;
 
         const content = response?.data?.content || "";
@@ -301,6 +413,9 @@ chatRouter.post("/sync", async (req: Request, res: Response) => {
 
         await session.destroy();
         await client.stop();
+        if (tempAttachmentDir) {
+            await rm(tempAttachmentDir, { recursive: true, force: true });
+        }
 
         res.json({ content, sessionId });
     } catch (error) {
@@ -312,6 +427,7 @@ chatRouter.post("/sync", async (req: Request, res: Response) => {
 
         try { if (session) await session.destroy(); } catch { /* ignore */ }
         try { if (client) await client.stop(); } catch { /* ignore */ }
+        try { if (tempAttachmentDir) await rm(tempAttachmentDir, { recursive: true, force: true }); } catch { /* ignore */ }
 
         res.status(500).json({ error: errorMessage });
     }

@@ -19,6 +19,9 @@ export const config = {
     /** Azure DevOps MCP auth token (fallback when per-user token is not available) */
     adoMcpAuthToken: process.env.ADO_MCP_AUTH_TOKEN || "",
 
+    /** Azure Application Insights connection string */
+    appInsightsConnectionString: process.env.APPLICATIONINSIGHTS_CONNECTION_STRING || "",
+
     /** Session time-to-live in milliseconds (default 30 min) */
     sessionTtlMs: 30 * 60 * 1000,
 
