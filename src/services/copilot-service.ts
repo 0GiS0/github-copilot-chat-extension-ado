@@ -1,5 +1,4 @@
-// Configuration for the proxy server
-const PROXY_BASE_URL = "http://localhost:3001";
+import { proxyBaseUrl } from "../config/proxy";
 
 // Session storage key for GitHub token
 const GITHUB_TOKEN_KEY = "copilot_github_token";
@@ -146,7 +145,7 @@ class CopilotService {
      * Returns the device code info for the UI to display.
      */
     async initiateDeviceFlow(): Promise<DeviceCodeResponse> {
-        const response = await fetch(`${PROXY_BASE_URL}/auth/device-code`, {
+        const response = await fetch(`${proxyBaseUrl}/auth/device-code`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
         });
@@ -164,7 +163,7 @@ class CopilotService {
      * Returns the token when ready, null if still pending.
      */
     async pollForToken(deviceCode: string): Promise<PollTokenResponse> {
-        const response = await fetch(`${PROXY_BASE_URL}/auth/poll-token`, {
+        const response = await fetch(`${proxyBaseUrl}/auth/poll-token`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ deviceCode }),
@@ -195,7 +194,7 @@ class CopilotService {
         }
 
         try {
-            const response = await fetch(`${PROXY_BASE_URL}/auth/verify`, {
+            const response = await fetch(`${proxyBaseUrl}/auth/verify`, {
                 headers: this.getAuthHeaders(),
             });
 
@@ -280,7 +279,7 @@ class CopilotService {
         }
 
         try {
-            const response = await fetch(`${PROXY_BASE_URL}/health`);
+            const response = await fetch(`${proxyBaseUrl}/health`);
 
             if (!response.ok) {
                 throw new Error(`Proxy server returned ${response.status}`);
@@ -304,7 +303,7 @@ class CopilotService {
             throw new Error("Not authenticated with GitHub");
         }
 
-        const response = await fetch(`${PROXY_BASE_URL}/models`, {
+        const response = await fetch(`${proxyBaseUrl}/models`, {
             headers: this.getAuthHeaders(),
         });
 
@@ -336,7 +335,7 @@ class CopilotService {
         }
 
         try {
-            const response = await fetch(`${PROXY_BASE_URL}/chat`, {
+            const response = await fetch(`${proxyBaseUrl}/chat`, {
                 method: "POST",
                 headers: this.getAuthHeaders(),
                 body: JSON.stringify({
@@ -448,7 +447,7 @@ class CopilotService {
             throw new Error("Not authenticated with GitHub");
         }
 
-        const response = await fetch(`${PROXY_BASE_URL}/chat/sync`, {
+        const response = await fetch(`${proxyBaseUrl}/chat/sync`, {
             method: "POST",
             headers: this.getAuthHeaders(),
             body: JSON.stringify({

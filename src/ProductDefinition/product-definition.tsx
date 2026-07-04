@@ -13,12 +13,11 @@ import {
   DEFAULT_MODEL_ID,
   resolvePreferredModelId,
 } from "../services/copilot-service";
+import { proxyBaseUrl } from "../config/proxy";
 import { Header, TitleSize } from "azure-devops-ui/Header";
 import { Page } from "azure-devops-ui/Page";
 import { Button } from "azure-devops-ui/Button";
 import copilotIcon from "../../static/copilot-icon.png";
-
-const PROXY_BASE_URL = "http://localhost:3001";
 
 interface ILanguageOption {
   code: string;
@@ -768,7 +767,7 @@ class ProductDefinitionHub extends React.Component<{}, IProductDefinitionState> 
       headers["X-ADO-Token"] = this.adoToken;
     }
 
-    const response = await fetch(PROXY_BASE_URL + "/chat", {
+    const response = await fetch(proxyBaseUrl + "/chat", {
       method: "POST",
       headers: headers,
       body: JSON.stringify({

@@ -11,6 +11,7 @@ import chalk from "chalk";
 import { config } from "./config.js";
 import { log } from "./logger.js";
 import { startSessionCleanup, clearAllSessions } from "./services/sessions.js";
+import { initializeTelemetry } from "./telemetry.js";
 
 // Routes
 import { authRouter } from "./routes/auth.js";
@@ -20,6 +21,8 @@ import { modelsRouter } from "./routes/models.js";
 
 const app = express();
 const requestBodyLimit = "20mb";
+
+initializeTelemetry();
 
 // ── Global middleware ───────────────────────────────────────────
 app.use(cors({ origin: true, credentials: true }));

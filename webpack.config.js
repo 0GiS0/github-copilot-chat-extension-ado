@@ -1,5 +1,16 @@
 const path = require("path");
+const webpack = require("webpack");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
+
+const defaultProxyBaseUrl = "http://localhost:3001";
+
+function normalizeProxyBaseUrl(value) {
+  const trimmedValue = (value || "").trim();
+  const resolvedValue = trimmedValue || defaultProxyBaseUrl;
+  return resolvedValue.endsWith("/")
+    ? resolvedValue.slice(0, -1)
+    : resolvedValue;
+}
 
 // Webpack entry points. Mapping from resulting bundle name to the source file entry.
 const entries = {};
@@ -57,6 +68,11 @@ module.exports = (env, argv) => ({
     ],
   },
   plugins: [
+    new webpack.DefinePlugin({
+      __COPILOT_PROXY_BASE_URL__: JSON.stringify(
+        normalizeProxyBaseUrl(process.env.COPILOT_PROXY_BASE_URL),
+      ),
+    }),
     new CopyWebpackPlugin({
       patterns: [
         { from: "src/Hub/copilot-hub-group.html", to: "copilot-hub-group/" },
