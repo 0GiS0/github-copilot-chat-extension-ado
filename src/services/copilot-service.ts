@@ -43,6 +43,20 @@ export interface CopilotModel {
     premiumRequests: number;
 }
 
+export const DEFAULT_MODEL_ID = "";
+
+export function resolvePreferredModelId(
+    models: CopilotModel[],
+    preferredModel?: string | null,
+): string {
+    const normalizedPreferredModel = preferredModel?.trim();
+    if (normalizedPreferredModel && models.some((model) => model.id === normalizedPreferredModel)) {
+        return normalizedPreferredModel;
+    }
+
+    return models[0]?.id ?? DEFAULT_MODEL_ID;
+}
+
 export interface AdoContext {
     orgName: string;
     projectName: string | null;
@@ -329,7 +343,7 @@ class CopilotService {
                     message: prompt,
                     sessionId: this.sessionId,
                     language: this.language,
-                    model: model,
+                    model: model?.trim() || undefined,
                     adoContext: this.adoContext,
                 }),
             });
@@ -441,7 +455,7 @@ class CopilotService {
                 message: prompt,
                 sessionId: this.sessionId,
                 language: this.language,
-                model: model,
+                model: model?.trim() || undefined,
                 adoContext: this.adoContext,
             }),
         });
@@ -478,6 +492,13 @@ class CopilotService {
      */
     getSessionId(): string | null {
         return this.sessionId;
+    }
+
+    /**
+     * Restore or clear the current conversation session id.
+     */
+    setSessionId(sessionId: string | null): void {
+        this.sessionId = sessionId;
     }
 }
 

@@ -26,7 +26,7 @@
     "url": "https://github.com/0GiS0/github-copilot-chat-extension-ado/issues"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "scripts": {
     "clean": "rimraf ./dist",
@@ -66,7 +66,7 @@
     "@types/jest": "^26.0.3",
     "@types/react": "~16.8.2",
     "@types/react-dom": "~16.8.0",
-    "concurrently": "^9.2.1",
+    "concurrently": "^9.2.3",
     "copy-webpack-plugin": "^14.0.0",
     "cross-env": "^7.0.3",
     "css-loader": "^7.1.3",

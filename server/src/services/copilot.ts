@@ -1,22 +1,17 @@
 /**
- * 🧠 Copilot SDK client — lazy-loaded because @github/copilot-sdk is ESM-only.
+ * 🧠 Copilot SDK runtime — lazy-loaded because @github/copilot-sdk is ESM-only.
  */
 
-let _CopilotClient: any;
-let _approveAll: any;
+let _runtime: { CopilotClient: any; approveAll: any } | null = null;
 
-export async function getCopilotClient(): Promise<any> {
-    if (!_CopilotClient) {
+export async function getCopilotRuntime(): Promise<{ CopilotClient: any; approveAll: any }> {
+    if (!_runtime) {
         const sdk = await import("@github/copilot-sdk");
-        _CopilotClient = sdk.CopilotClient;
-        _approveAll = sdk.approveAll;
+        _runtime = {
+            CopilotClient: sdk.CopilotClient,
+            approveAll: sdk.approveAll,
+        };
     }
-    return _CopilotClient;
-}
 
-export async function getApproveAll(): Promise<any> {
-    if (!_approveAll) {
-        await getCopilotClient(); // triggers lazy load
-    }
-    return _approveAll;
+    return _runtime;
 }

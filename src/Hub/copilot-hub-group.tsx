@@ -6,7 +6,18 @@ import * as SDK from "azure-devops-extension-sdk";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import { copilotService, CopilotModel, AdoContext } from "../services/copilot-service";
+import {
+  copilotService,
+  CopilotModel,
+  AdoContext,
+  DEFAULT_MODEL_ID,
+  resolvePreferredModelId,
+} from "../services/copilot-service";
+import {
+  storageService,
+  IChatHistoryStorageContext,
+  IStoredChatHistory,
+} from "../services/storage-service";
 
 import { Header, TitleSize } from "azure-devops-ui/Header";
 import { Page } from "azure-devops-ui/Page";
@@ -349,6 +360,8 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
   private textareaRef = React.createRef<HTMLTextAreaElement>();
   private modelSelectorRef = React.createRef<HTMLDivElement>();
   private pollInterval: ReturnType<typeof setInterval> | null = null;
+  private chatStorageContext: IChatHistoryStorageContext | null = null;
+  private isHistoryReady = false;
 
   constructor(props: {}) {
     super(props);
@@ -371,7 +384,7 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
       authError: null,
       // Models
       models: [],
-      selectedModel: "gpt-5.2",
+      selectedModel: DEFAULT_MODEL_ID,
       modelsLoading: false,
       isModelSelectorOpen: false,
       // Tool progress
@@ -380,46 +393,22 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
   }
 
   public async componentDidMount() {
-    await SDK.init();
-    await SDK.ready();
-
-    const user = SDK.getUser();
-    const defaultLang = LANGUAGES[1];
-
-    // Request high-resolution avatar from Azure DevOps
-    let userImageUrl = user.imageUrl || "";
-    if (userImageUrl) {
-      // Azure DevOps API supports size parameter: small, medium, large
-      // Replace or add size=large parameter for better resolution
-      const url = new URL(userImageUrl);
-      url.searchParams.set('size', 'large');
-      userImageUrl = url.toString();
-    }
-
-    this.setState({
-      userName: user.displayName,
-      userImageUrl,
-      messages: [
-        {
-          id: "welcome",
-          role: "assistant",
-          content: defaultLang.welcomeMessage(user.displayName),
-          timestamp: new Date(),
-        },
-      ],
-    });
-
-    // Get the Azure DevOps access token for the current user
     try {
-      const adoToken = await SDK.getAccessToken();
-      copilotService.setAdoToken(adoToken);
-      console.log("[CopilotChatHub] ADO access token obtained");
-    } catch (error) {
-      console.warn("[CopilotChatHub] Failed to get ADO access token:", error);
-    }
+      await SDK.init();
+      await SDK.ready();
 
-    // Capture Azure DevOps navigation context (org, project, team)
-    try {
+      const user = SDK.getUser();
+
+      // Request high-resolution avatar from Azure DevOps
+      let userImageUrl = user.imageUrl || "";
+      if (userImageUrl) {
+        // Azure DevOps API supports size parameter: small, medium, large
+        // Replace or add size=large parameter for better resolution
+        const url = new URL(userImageUrl);
+        url.searchParams.set("size", "large");
+        userImageUrl = url.toString();
+      }
+
       const host = SDK.getHost();
       const webContext = SDK.getWebContext();
       const adoContext: AdoContext = {
@@ -429,31 +418,74 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
         teamName: webContext?.team?.name || null,
         teamId: webContext?.team?.id || null,
       };
+      this.chatStorageContext = {
+        orgName: host.name,
+        projectId: adoContext.projectId,
+        projectName: adoContext.projectName,
+        userId: user.id,
+      };
+
+      const storedChatHistory = storageService.loadChatHistory(this.chatStorageContext);
+      const restoredLanguage = this.getLanguageByCode(
+        storedChatHistory?.selectedLanguageCode,
+      );
+
+      copilotService.setLanguage(restoredLanguage.code);
       copilotService.setAdoContext(adoContext);
+      copilotService.setSessionId(storedChatHistory?.sessionId || null);
+
+      this.setState({
+        userName: user.displayName,
+        userImageUrl,
+        selectedLanguage: restoredLanguage,
+        selectedModel: storedChatHistory?.selectedModel || DEFAULT_MODEL_ID,
+        messages: this.getInitialMessages(
+          user.displayName,
+          restoredLanguage,
+          storedChatHistory,
+        ),
+      });
+      this.isHistoryReady = true;
       console.log("[CopilotChatHub] ADO context captured:", adoContext);
-    } catch (error) {
-      console.warn("[CopilotChatHub] Failed to capture ADO context:", error);
-    }
 
-    // Close model dropdown on outside click
-    document.addEventListener("mousedown", this.handleClickOutside);
-
-    // Initialize proxy connection
-    this.initializeCopilot();
-
-    // If already authenticated (token in sessionStorage), verify it still works
-    if (copilotService.isAuthenticated()) {
-      console.log("[CopilotChatHub] Found existing token, verifying...");
-      const verification = await copilotService.verifyToken();
-      if (verification.valid) {
-        console.log(`[CopilotChatHub] Token is valid for: ${verification.login}`);
-        this.setState({ isAuthenticated: true });
-        this.loadModels();
-      } else {
-        console.warn("[CopilotChatHub] Stored token is invalid, clearing...");
-        copilotService.clearToken();
-        this.setState({ isAuthenticated: false });
+      // Get the Azure DevOps access token for the current user
+      try {
+        const adoToken = await SDK.getAccessToken();
+        copilotService.setAdoToken(adoToken);
+        console.log("[CopilotChatHub] ADO access token obtained");
+      } catch (error) {
+        console.warn("[CopilotChatHub] Failed to get ADO access token:", error);
       }
+
+      // Close model dropdown on outside click
+      document.addEventListener("mousedown", this.handleClickOutside);
+
+      // Initialize proxy connection
+      this.initializeCopilot();
+
+      await SDK.notifyLoadSucceeded();
+
+      // If already authenticated (token in sessionStorage), verify it still works
+      if (copilotService.isAuthenticated()) {
+        console.log("[CopilotChatHub] Found existing token, verifying...");
+        const verification = await copilotService.verifyToken();
+        if (verification.valid) {
+          console.log(`[CopilotChatHub] Token is valid for: ${verification.login}`);
+          this.setState({ isAuthenticated: true });
+          this.loadModels();
+        } else {
+          console.warn("[CopilotChatHub] Stored token is invalid, clearing...");
+          copilotService.clearToken();
+          this.setState({ isAuthenticated: false });
+        }
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      console.error("[CopilotChatHub] Failed to initialize extension:", error);
+      await SDK.notifyLoadFailed(message);
+      this.setState({
+        connectionError: message,
+      });
     }
   }
 
@@ -601,7 +633,9 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
     this.setState({
       isAuthenticated: false,
       models: [],
-      selectedModel: "gpt-5.2",
+      selectedModel: DEFAULT_MODEL_ID,
+    }, () => {
+      this.persistChatHistory();
     });
   };
 
@@ -609,10 +643,9 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
     this.setState({ modelsLoading: true });
     try {
       const models = await copilotService.fetchModels();
-      const defaultModel = models.find((m) => m.id === "gpt-5.2");
       this.setState({
         models,
-        selectedModel: defaultModel ? defaultModel.id : models.length > 0 ? models[0].id : "gpt-5.2",
+        selectedModel: resolvePreferredModelId(models, this.state.selectedModel),
         modelsLoading: false,
       });
     } catch (error) {
@@ -636,14 +669,7 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
     this.setState({
       selectedModel: modelId,
       isModelSelectorOpen: false,
-      messages: [
-        {
-          id: "welcome",
-          role: "assistant",
-          content: selectedLanguage.welcomeMessage(userName),
-          timestamp: new Date(),
-        },
-      ],
+      messages: [this.createWelcomeMessage(userName, selectedLanguage)],
     });
   };
 
@@ -655,6 +681,67 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
     if (prevState.messages.length !== this.state.messages.length) {
       this.scrollToBottom();
     }
+
+    if (
+      this.isHistoryReady &&
+      (prevState.messages !== this.state.messages ||
+        prevState.selectedLanguage.code !== this.state.selectedLanguage.code ||
+        prevState.selectedModel !== this.state.selectedModel ||
+        prevState.isAuthenticated !== this.state.isAuthenticated)
+    ) {
+      this.persistChatHistory();
+    }
+  }
+
+  private getLanguageByCode(languageCode?: string): ILanguage {
+    return (
+      LANGUAGES.find((language) => language.code === languageCode) || LANGUAGES[1]
+    );
+  }
+
+  private createWelcomeMessage(
+    userName: string,
+    language: ILanguage,
+  ): IChatMessage {
+    return {
+      id: "welcome",
+      role: "assistant",
+      content: language.welcomeMessage(userName),
+      timestamp: new Date(),
+    };
+  }
+
+  private getInitialMessages(
+    userName: string,
+    language: ILanguage,
+    storedChatHistory: IStoredChatHistory | null,
+  ): IChatMessage[] {
+    if (!storedChatHistory || storedChatHistory.messages.length === 0) {
+      return [this.createWelcomeMessage(userName, language)];
+    }
+
+    return storedChatHistory.messages.map((message) => ({
+      ...message,
+      timestamp: new Date(message.timestamp),
+    }));
+  }
+
+  private persistChatHistory() {
+    if (!this.chatStorageContext) {
+      return;
+    }
+
+    const { messages, selectedLanguage, selectedModel } = this.state;
+
+    storageService.saveChatHistory(this.chatStorageContext, {
+      messages: messages.map((message) => ({
+        ...message,
+        timestamp: message.timestamp.toISOString(),
+      })),
+      selectedLanguageCode: selectedLanguage.code,
+      selectedModel,
+      sessionId: copilotService.getSessionId(),
+    });
   }
 
   private handleInputChange = (
@@ -856,6 +943,31 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
   private handlePromptClick = (prompt: string) => {
     this.setState({ inputValue: prompt }, () => {
       this.handleSendMessage();
+    });
+  };
+
+  private handleClearHistory = () => {
+    if (!window.confirm("Clear the saved chat history for this project?")) {
+      return;
+    }
+
+    const { userName, selectedLanguage } = this.state;
+
+    copilotService.resetSession();
+    if (this.chatStorageContext) {
+      storageService.clearChatHistory(this.chatStorageContext);
+    }
+
+    if (this.textareaRef.current) {
+      this.textareaRef.current.style.height = "auto";
+    }
+
+    this.setState({
+      inputValue: "",
+      isLoading: false,
+      streamingMessageId: null,
+      toolAction: null,
+      messages: [this.createWelcomeMessage(userName, selectedLanguage)],
     });
   };
 
@@ -1073,8 +1185,8 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
                   ariaLabel="Send"
                 />
                 </div>
-                {isAuthenticated && (models.length > 0 || modelsLoading) && (
-                  <div className="input-bottom-bar">
+                <div className="input-bottom-bar">
+                 {isAuthenticated && (models.length > 0 || modelsLoading) && (
                     <div className="model-selector-container" ref={this.modelSelectorRef}>
                       {modelsLoading ? (
                         <span className="model-loading">⏳</span>
@@ -1116,8 +1228,15 @@ class CopilotChatHub extends React.Component<{}, ICopilotChatState> {
                         </>
                       )}
                     </div>
-                  </div>
-                )}
+                 )}
+                 <button
+                   className="history-action-button"
+                   onClick={this.handleClearHistory}
+                   disabled={isLoading || messages.length <= 1}
+                 >
+                   Clear history
+                 </button>
+               </div>
               </div>
             </div>
 

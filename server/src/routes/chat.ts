@@ -7,7 +7,7 @@ import path from "path";
 import { Router, Request, Response } from "express";
 import { log } from "../logger.js";
 import { getGitHubToken, tokenKey } from "../middleware/auth.js";
-import { getCopilotClient, getApproveAll } from "../services/copilot.js";
+import { getCopilotRuntime } from "../services/copilot.js";
 import { getMcpConfig } from "../services/mcp.js";
 import { getSession, setSession, deleteSession } from "../services/sessions.js";
 import { getSystemMessage, AdoContext } from "../prompts/system.js";
@@ -23,6 +23,35 @@ interface IncomingAttachment {
 }
 
 type KnowledgeBaseOption = "sharepoint" | "confluence" | "azure-devops-wiki";
+
+async function resolveSessionModel(
+    client: any,
+    requestedModel?: string,
+): Promise<string | undefined> {
+    const normalizedRequestedModel = requestedModel?.trim();
+    const models = await client.listModels();
+    const availableModels = models.filter((model: any) => model.policy?.state !== "disabled");
+
+    if (normalizedRequestedModel && availableModels.some((model: any) => model.id === normalizedRequestedModel)) {
+        return normalizedRequestedModel;
+    }
+
+    const fallbackModel = availableModels[0]?.id;
+    if (normalizedRequestedModel && fallbackModel) {
+        log.warn(`[chat] Requested model "${normalizedRequestedModel}" is unavailable. Falling back to "${fallbackModel}".`);
+    }
+
+    return fallbackModel;
+}
+
+function normalizeSessionId(sessionId?: string): string | null {
+    if (typeof sessionId !== "string") {
+        return null;
+    }
+
+    const trimmed = sessionId.trim();
+    return trimmed ? trimmed : null;
+}
 
 function parseDataUrl(dataUrl: string): { mimeType: string; buffer: Buffer } {
     const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
@@ -102,8 +131,9 @@ chatRouter.post("/", async (req: Request, res: Response) => {
         return;
     }
 
-    const { message, language = "es", model: requestedModel, knowledgeBase, adoContext, attachments } = req.body as {
+    const { message, sessionId: requestedSessionId, language = "es", model: requestedModel, knowledgeBase, adoContext, attachments } = req.body as {
         message?: string;
+        sessionId?: string;
         language?: string;
         model?: string;
         knowledgeBase?: KnowledgeBaseOption;
@@ -120,8 +150,6 @@ chatRouter.post("/", async (req: Request, res: Response) => {
         res.status(400).json({ error: "Message is required" });
         return;
     }
-
-    const model = requestedModel || "gpt-5.2";
 
     log.question("pending", message);
     if (adoContext?.projectName) {
@@ -141,13 +169,15 @@ chatRouter.post("/", async (req: Request, res: Response) => {
 
     try {
         const key = tokenKey(githubToken);
-        const existing = getSession(key);
+        const normalizedSessionId = normalizeSessionId(requestedSessionId);
+        const existing = normalizedSessionId
+            ? { sessionId: normalizedSessionId }
+            : getSession(key);
         const mcpConfig = getMcpConfig(adoToken, adoContext?.orgName || undefined);
-        const approveAll = await getApproveAll();
-
-        const ClientClass = await getCopilotClient();
+        const { CopilotClient: ClientClass, approveAll } = await getCopilotRuntime();
         client = new ClientClass({ githubToken });
         await client.start();
+        const model = await resolveSessionModel(client, requestedModel);
 
         // Create per-request tools that capture the user's ADO token
         const adoTools = adoToken
@@ -158,39 +188,40 @@ chatRouter.post("/", async (req: Request, res: Response) => {
         let isNew: boolean;
 
         const sessionOpts = {
-            model,
             streaming: true,
             onPermissionRequest: approveAll,
             systemMessage: { content: getSystemMessage(language, adoContext) },
             mcpServers: mcpConfig,
             customAgents: [quickstartsExpertAgent, productDefinitionExpert],
             tools: adoTools,
+            ...(model ? { model } : {}),
         };
 
         if (existing) {
             try {
                 sessionId = existing.sessionId;
                 session = await client.resumeSession(sessionId, sessionOpts);
+                setSession(key, sessionId);
                 isNew = false;
                 log.session("resumed", sessionId);
             } catch (_err) {
                 log.warn(`Failed to resume session ${existing.sessionId}, creating new one`);
                 deleteSession(key);
-                sessionId = `ado-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+                sessionId = normalizedSessionId || `ado-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
                 session = await client.createSession({ sessionId, ...sessionOpts });
                 setSession(key, sessionId);
                 isNew = true;
                 log.session("created", sessionId);
             }
         } else {
-            sessionId = `ado-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            sessionId = normalizedSessionId || `ado-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
             session = await client.createSession({ sessionId, ...sessionOpts });
             setSession(key, sessionId);
             isNew = true;
             log.session("created", sessionId);
         }
 
-        log.copilot(`Client ready for user (model: ${model}, ${isNew ? "new" : "resumed"} session)`);
+        log.copilot(`Client ready for user (model: ${model || "auto"}, ${isNew ? "new" : "resumed"} session)`);
         log.streaming(sessionId);
 
         // Send session ID to client
@@ -276,7 +307,7 @@ chatRouter.post("/", async (req: Request, res: Response) => {
                 log.warn("Client disconnected");
                 cleanupSubscriptions();
                 req.off("close", onClose);
-                session?.destroy().catch(() => {});
+                session?.disconnect().catch(() => {});
                 client?.stop().catch(() => {});
             }
         };
@@ -297,7 +328,7 @@ chatRouter.post("/", async (req: Request, res: Response) => {
         log.complete(sessionId, duration);
         log.debug(`Chunks: ${chunkCount} | Chars: ${fullContent.length}`);
 
-        await session.destroy();
+        await session.disconnect();
         await client.stop();
         if (tempAttachmentDir) {
             await rm(tempAttachmentDir, { recursive: true, force: true });
@@ -313,7 +344,7 @@ chatRouter.post("/", async (req: Request, res: Response) => {
         const key = tokenKey(githubToken);
         deleteSession(key);
 
-        try { if (session) await session.destroy(); } catch { /* ignore */ }
+        try { if (session) await session.disconnect(); } catch { /* ignore */ }
         try { if (client) await client.stop(); } catch { /* ignore */ }
         try { if (tempAttachmentDir) await rm(tempAttachmentDir, { recursive: true, force: true }); } catch { /* ignore */ }
 
@@ -332,7 +363,7 @@ chatRouter.post("/sync", async (req: Request, res: Response) => {
 
     const {
         message,
-        sessionId: _unusedSessionId = "default",
+        sessionId: requestedSessionId,
         language = "es",
         model: requestedModel,
         knowledgeBase,
@@ -357,9 +388,8 @@ chatRouter.post("/sync", async (req: Request, res: Response) => {
         return;
     }
 
-    log.question(_unusedSessionId, message);
+    log.question(requestedSessionId || "default", message);
 
-    const model = requestedModel || "gpt-5.2";
     const adoToken = req.headers["x-ado-token"] as string | undefined;
 
     let client: any = null;
@@ -368,26 +398,28 @@ chatRouter.post("/sync", async (req: Request, res: Response) => {
 
     try {
         const key = tokenKey(githubToken);
-        const existing = getSession(key);
+        const normalizedSessionId = normalizeSessionId(requestedSessionId);
+        const existing = normalizedSessionId
+            ? { sessionId: normalizedSessionId }
+            : getSession(key);
         const mcpConfig = getMcpConfig(adoToken, adoContext?.orgName || undefined);
-        const approveAll = await getApproveAll();
-
-        const ClientClass = await getCopilotClient();
+        const { CopilotClient: ClientClass, approveAll } = await getCopilotRuntime();
         client = new ClientClass({ githubToken });
         await client.start();
+        const model = await resolveSessionModel(client, requestedModel);
 
         const adoTools = adoToken
             ? await createAdoProjectTools(adoToken)
             : [];
 
         const sessionOpts = {
-            model,
             streaming: true,
             onPermissionRequest: approveAll,
             systemMessage: { content: getSystemMessage(language, adoContext) },
             mcpServers: mcpConfig,
             customAgents: [quickstartsExpertAgent, productDefinitionExpert],
             tools: adoTools,
+            ...(model ? { model } : {}),
         };
 
         let sessionId: string;
@@ -395,8 +427,9 @@ chatRouter.post("/sync", async (req: Request, res: Response) => {
         if (existing) {
             sessionId = existing.sessionId;
             session = await client.resumeSession(sessionId, sessionOpts);
+            setSession(key, sessionId);
         } else {
-            sessionId = `ado-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            sessionId = normalizedSessionId || `ado-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
             session = await client.createSession({ sessionId, ...sessionOpts });
             setSession(key, sessionId);
         }
@@ -411,7 +444,7 @@ chatRouter.post("/sync", async (req: Request, res: Response) => {
         log.answer(sessionId, content.length);
         log.complete(sessionId, duration);
 
-        await session.destroy();
+        await session.disconnect();
         await client.stop();
         if (tempAttachmentDir) {
             await rm(tempAttachmentDir, { recursive: true, force: true });
@@ -425,7 +458,7 @@ chatRouter.post("/sync", async (req: Request, res: Response) => {
         const key = tokenKey(githubToken);
         deleteSession(key);
 
-        try { if (session) await session.destroy(); } catch { /* ignore */ }
+        try { if (session) await session.disconnect(); } catch { /* ignore */ }
         try { if (client) await client.stop(); } catch { /* ignore */ }
         try { if (tempAttachmentDir) await rm(tempAttachmentDir, { recursive: true, force: true }); } catch { /* ignore */ }
 

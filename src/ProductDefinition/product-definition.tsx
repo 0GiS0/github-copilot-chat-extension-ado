@@ -6,7 +6,13 @@ import * as SDK from "azure-devops-extension-sdk";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import { copilotService, AdoContext, CopilotModel } from "../services/copilot-service";
+import {
+  copilotService,
+  AdoContext,
+  CopilotModel,
+  DEFAULT_MODEL_ID,
+  resolvePreferredModelId,
+} from "../services/copilot-service";
 import { Header, TitleSize } from "azure-devops-ui/Header";
 import { Page } from "azure-devops-ui/Page";
 import { Button } from "azure-devops-ui/Button";
@@ -249,7 +255,7 @@ class ProductDefinitionHub extends React.Component<{}, IProductDefinitionState> 
       isLoading: false,
       language: "en",
       models: [],
-      selectedModel: "gpt-5.2",
+      selectedModel: DEFAULT_MODEL_ID,
       selectedKnowledgeBase: "azure-devops-wiki",
       modelsLoading: false,
       isImmersiveMode: false,
@@ -509,15 +515,14 @@ class ProductDefinitionHub extends React.Component<{}, IProductDefinitionState> 
   private async loadModels() {
     this.setState({ modelsLoading: true });
     try {
-      const models = await copilotService.fetchModels();
-      const defaultModel = models.find((model) => model.id === "gpt-5.2");
-      this.setState({
-        models,
-        selectedModel: defaultModel ? defaultModel.id : models.length > 0 ? models[0].id : "gpt-5.2",
-        modelsLoading: false,
-      });
+    const models = await copilotService.fetchModels();
+    this.setState({
+      models,
+      selectedModel: resolvePreferredModelId(models, this.state.selectedModel),
+      modelsLoading: false,
+    });
     } catch (error) {
-      console.error("[ProductDefinitionHub] Failed to load models:", error);
+    console.error("[ProductDefinitionHub] Failed to load models:", error);
       this.setState({ modelsLoading: false });
     }
   }

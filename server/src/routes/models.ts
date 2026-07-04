@@ -4,7 +4,7 @@
 import { Router, Request, Response } from "express";
 import { log } from "../logger.js";
 import { getGitHubToken } from "../middleware/auth.js";
-import { getCopilotClient } from "../services/copilot.js";
+import { getCopilotRuntime } from "../services/copilot.js";
 
 export const modelsRouter = Router();
 
@@ -18,7 +18,7 @@ modelsRouter.get("/", async (req: Request, res: Response) => {
     }
 
     try {
-        const ClientClass = await getCopilotClient();
+        const { CopilotClient: ClientClass } = await getCopilotRuntime();
         const client = new ClientClass({ githubToken });
         await client.start();
 
