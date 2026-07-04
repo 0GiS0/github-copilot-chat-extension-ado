@@ -19,10 +19,12 @@ import { healthRouter } from "./routes/health.js";
 import { modelsRouter } from "./routes/models.js";
 
 const app = express();
+const requestBodyLimit = "20mb";
 
 // ── Global middleware ───────────────────────────────────────────
 app.use(cors({ origin: true, credentials: true }));
-app.use(express.json());
+app.use(express.json({ limit: requestBodyLimit }));
+app.use(express.urlencoded({ extended: true, limit: requestBodyLimit }));
 
 // ── Mount routers ───────────────────────────────────────────────
 app.use("/auth", authRouter);
