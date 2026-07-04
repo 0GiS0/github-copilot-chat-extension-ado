@@ -2,6 +2,7 @@
  * 💬 Chat routes — /chat (streaming) and /chat/sync (non-streaming)
  */
 import { mkdtemp, rm, writeFile } from "fs/promises";
+import { randomUUID } from "crypto";
 import os from "os";
 import path from "path";
 import { Router, Request, Response } from "express";
@@ -23,6 +24,10 @@ interface IncomingAttachment {
 }
 
 type KnowledgeBaseOption = "sharepoint" | "confluence" | "azure-devops-wiki";
+
+function createSessionId(): string {
+    return `ado-${Date.now()}-${randomUUID().slice(0, 8)}`;
+}
 
 async function resolveSessionModel(
     client: any,
@@ -207,14 +212,14 @@ chatRouter.post("/", async (req: Request, res: Response) => {
             } catch (_err) {
                 log.warn(`Failed to resume session ${existing.sessionId}, creating new one`);
                 deleteSession(key);
-                sessionId = normalizedSessionId || `ado-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+                sessionId = normalizedSessionId || createSessionId();
                 session = await client.createSession({ sessionId, ...sessionOpts });
                 setSession(key, sessionId);
                 isNew = true;
                 log.session("created", sessionId);
             }
         } else {
-            sessionId = normalizedSessionId || `ado-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            sessionId = normalizedSessionId || createSessionId();
             session = await client.createSession({ sessionId, ...sessionOpts });
             setSession(key, sessionId);
             isNew = true;
@@ -429,7 +434,7 @@ chatRouter.post("/sync", async (req: Request, res: Response) => {
             session = await client.resumeSession(sessionId, sessionOpts);
             setSession(key, sessionId);
         } else {
-            sessionId = normalizedSessionId || `ado-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            sessionId = normalizedSessionId || createSessionId();
             session = await client.createSession({ sessionId, ...sessionOpts });
             setSession(key, sessionId);
         }
