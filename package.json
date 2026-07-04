@@ -59,7 +59,7 @@
     "remark-gfm": "^1.0.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.21.8",
+    "@babel/core": "^7.29.6",
     "@testing-library/jest-dom": "^5.11.0",
     "@testing-library/react": "^10.4.4",
     "@types/jest": "^26.0.3",
@@ -109,6 +109,9 @@
     }
   },
   "overrides": {
+    "jest-environment-jsdom": {
+      "jsdom": "^20.0.3"
+    },
     "tfx-cli": {
       "xml2js": "0.5.0"
     }
