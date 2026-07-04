@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "westeurope"
+    },
+    "namePrefix": {
+      "value": "copilotado"
+    },
+    "environmentName": {
+      "value": "dev"
+    },
+    "adoOrg": {
+      "value": "your-ado-org"
+    },
+    "servicePlanSkuName": {
+      "value": "B1"
+    },
+    "servicePlanSkuTier": {
+      "value": "Basic"
+    },
+    "startupCommand": {
+      "value": "npm start"
+    },
+    "enableAlwaysOn": {
+      "value": true
+    },
+    "tags": {
+      "value": {
+        "application": "github-copilot-chat-extension-ado",
+        "environment": "dev"
+      }
+    }
+  }
+}

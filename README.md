@@ -62,6 +62,8 @@ npm run dev
 npm run build
 ```
 
+For Azure-hosted deployments, provision the backend resources from `infra/` and build the extension with `COPILOT_PROXY_BASE_URL=https://<your-web-app>.azurewebsites.net`.
+
 ## 📦 Main Scripts
 
 | Script | Description |
@@ -85,6 +87,7 @@ npm run build
 
 - [Azure DevOps Extensions](https://docs.microsoft.com/en-us/azure/devops/extend/)
 - [Publishing Guide](https://docs.microsoft.com/en-us/azure/devops/extend/publish/overview)
+- [Azure deployment Bicep](infra/README.md)
 
 ## 📄 License
 
