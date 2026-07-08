@@ -17,6 +17,7 @@ const entries = {};
 
 // Add entry for the Hub
 entries["copilot-hub-group"] = "./src/Hub/copilot-hub-group";
+entries["pipeline-sessions"] = "./src/PipelineSessions/pipeline-sessions";
 entries["product-definition"] = "./src/ProductDefinition/product-definition";
 
 module.exports = (env, argv) => ({
@@ -76,6 +77,7 @@ module.exports = (env, argv) => ({
     new CopyWebpackPlugin({
       patterns: [
         { from: "src/Hub/copilot-hub-group.html", to: "copilot-hub-group/" },
+        { from: "src/PipelineSessions/pipeline-sessions.html", to: "pipeline-sessions/" },
         { from: "src/ProductDefinition/product-definition.html", to: "product-definition/" },
       ],
     }),
