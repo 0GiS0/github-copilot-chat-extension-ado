@@ -27,6 +27,7 @@ This repository contains an Azure DevOps extension that brings GitHub Copilot Ch
 
 - 💬 Chat interface integrated into Azure DevOps
 - 🤖 GitHub Copilot integration for code assistance
+- 🔄 Pipeline Sessions hub to inspect active pipeline runs and discover published Copilot session metadata
 - 🎨 Native UI that adapts to Azure DevOps theme
 - 🔐 OAuth authentication with GitHub Device Flow
 - 🔄 Hot Reload for local development

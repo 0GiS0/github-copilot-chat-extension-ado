@@ -1,0 +1,20 @@
+{
+    "contributions": [
+        {
+            "id": "pipeline-sessions-hub",
+            "type": "ms.vss-web.hub",
+            "targets": [
+                ".copilot-hub-group"
+            ],
+            "properties": {
+                "name": "Pipeline Sessions",
+                "uri": "dist/pipeline-sessions/pipeline-sessions.html",
+                "icon": {
+                    "light": "static/copilot-icon.png",
+                    "dark": "static/copilot-icon.png"
+                },
+                "order": 2
+            }
+        }
+    ]
+}
